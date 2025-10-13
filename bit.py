@@ -1,15 +1,24 @@
 import os
 import sys
 
-pathToBitDir = os.path.join(os.getcwd(), '.bit')
+def main():
+  """
+  Initializes a new Bit repository.
+  """
+  bit_dir = os.path.join(os.getcwd(), '.bit')
 
-if (os.path.exists(pathToBitDir)):
-  sys.stderr.write("Error: A bit repository already exists in this directory.\n")
-  exit(1)
+  if os.path.exists(bit_dir):
+      sys.stderr.write("Error: A Bit repository already exists in this directory.\n")
+      sys.exit(1)
 
-os.makedirs(".bit/objects")
-with open(os.path.join(pathToBitDir, "HEAD"), "x") as file:
-  file.write("ref: refs/heads/master")
-open(os.path.join(pathToBitDir, "index"), "x")
+  os.makedirs(os.path.join(bit_dir, "objects"))
+  with open(os.path.join(bit_dir, "HEAD"), "w") as file:
+    file.write("ref: refs/heads/master\n")
+  
+  open(os.path.join(bit_dir, "index"), "w").close()
 
-print("Initialized empty Bit repository in " + pathToBitDir)
+  print(f"Initialized empty Bit repository in {bit_dir}")
+
+
+if __name__ == "__main__":
+    main()
