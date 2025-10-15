@@ -2,7 +2,6 @@ import os
 import sys
 import hashlib
 import time
-import pathlib
 
 # --- Core ---
 
@@ -15,6 +14,7 @@ def init():
         return False
 
     os.makedirs(os.path.join(bit_dir, "objects"))
+    os.makedirs(os.path.join(bit_dir, "refs", "head"), exist_ok=True)
     with open(os.path.join(bit_dir, "HEAD"), "w") as file:
         file.write("ref: refs/heads/master\n")
     open(os.path.join(bit_dir, "index"), "w").close()
@@ -46,7 +46,7 @@ def add(file_path):
     # update/add to the index
     index_path = os.path.join(bit_dir, "index")
     index = {}
-    if os.path.exists(index_path) and os.path.getsize(index_path) > 0:
+    if os.path.getsize(index_path) > 0:
         with open(index_path, 'r') as file:
             for line in file:
                 sha1, path = line.strip().split(' ', 1)
@@ -56,9 +56,9 @@ def add(file_path):
     relative_path = relative_path_os.replace(os.sep, '/')
     index[relative_path] = hash_value
 
-    with open(index_path, 'w') as file:
-        for path, sha1 in sorted(index.items()):
-            file.write(f"{sha1} {path}\n")
+    with open(index_path, 'w', encoding='utf-8') as file:
+      for path, sha1 in sorted(index.items()):
+          file.write(f"{sha1} {path}\n")
 
 def commit(message):
     """
@@ -71,7 +71,7 @@ def commit(message):
     objects_path = os.path.join(bit_dir, 'objects')
 
     # check if index file is empty
-    if not os.path.exists(index_path) or os.path.getsize(index_path) == 0:
+    if os.path.getsize(index_path) == 0:
         print(f"Aborted: No changes to commit.")
         return False
 
@@ -102,19 +102,19 @@ def commit(message):
     email = os.environ.get("GIT_AUTHOR_EMAIL", "isaiahpfisher@gmail.com")
     timestamp = int(time.time())
     timezone_offset = time.strftime('%z')
-    commit_contents += f"Author {name} <{email}> {timestamp} {timezone_offset}\n"
-    commit_contents += f"Committer {name} <{email}> {timestamp} {timezone_offset}\n\n"
+    commit_contents += f"author {name} <{email}> {timestamp} {timezone_offset}\n"
+    commit_contents += f"committer {name} <{email}> {timestamp} {timezone_offset}\n\n"
     
     commit_contents += message
     
     commit_hash = hashlib.sha1(commit_contents.encode('utf-8')).hexdigest()
-    with open(os.path.join(objects_path, commit_hash), 'w') as file:
-        file.write(commit_contents)
+    with open(os.path.join(objects_path, commit_hash), 'wb') as file:
+        file.write(commit_contents.encode('utf-8'))
     
     # update the branch head
-    pathlib.Path(os.path.dirname(branch_head_path)).mkdir(exist_ok=True, parents=True)
-    with open(branch_head_path, "w") as file:
-        file.write(commit_hash)
+    os.makedirs(os.path.dirname(branch_head_path), exist_ok=True)
+    with open(branch_head_path, "wb") as file:
+        file.write(commit_hash.encode("utf-8"))
       
     # clear index file
     open(index_path, 'w').close()
@@ -136,25 +136,24 @@ def build_tree(file_structure):
           
     
     hash_value = hashlib.sha1(contents.encode('utf-8')).hexdigest()
-    with open(os.path.join(objects_path, hash_value), 'w') as file:
-        file.write(contents)
+    with open(os.path.join(objects_path, hash_value), 'wb') as file:
+        file.write(contents.encode("utf-8"))
         
     return hash_value                  
         
 def build_file_structure(index):
-    file_structure = {}
+    file_structure = {'type': 'tree', 'children': {}}
     for path, sha1 in sorted(index.items()):
-        path_list = path.split("/")
-        file_name = path_list.pop()
-        if (len(path_list) == 0):
-            file_structure[file_name] = { 'type': 'blob', 'hash': sha1 }
-        else:
-            struct = file_structure
-            for tree in path_list:
-                struct = struct.setdefault(tree, { 'type': 'tree', 'children': {} })['children']
-            struct[file_name] = { 'type': 'blob', 'hash': sha1 }
-    
-    return file_structure
+        path_components = path.split('/')
+        current_level = file_structure['children']
+
+        for component in path_components[:-1]:
+            current_level = current_level.setdefault(component, {'type': 'tree', 'children': {}})['children']
+
+        filename = path_components[-1]
+        current_level[filename] = {'type': 'blob', 'hash': sha1}
+
+    return file_structure['children']
             
 
     
