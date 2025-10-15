@@ -2,7 +2,7 @@ import unittest
 import os
 import shutil
 import tempfile
-from bit import init, add # Import our refactored functions
+from .bit import init, add
 
 class TestBit(unittest.TestCase):
 
@@ -97,6 +97,11 @@ class TestBit(unittest.TestCase):
             lines = f.readlines()
             self.assertEqual(len(lines), 1)
             self.assertEqual(lines[0].strip(), f"{expected_hash_modified} file.txt")
+
+    def test_add_fails_for_bad_file_path(self):
+        """Test that adding a file path that doesn't exist fails."""
+        init()
+        self.assertFalse(add("file_that_does_not_exist.txt"))
 
 
 if __name__ == '__main__':
