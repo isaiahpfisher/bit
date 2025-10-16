@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+import os
+import sys
+from src.repository import Repository
+
+class CLI:
+    """CLI for Bit."""
+    
+    def __init__(self):
+        self.repo = Repository(os.getcwd())
+        
+    def run(self):
+        """Parse arguments and execute commands."""
+        if len(sys.argv) < 2:
+            self._print_usage()
+            return
+
+        command = sys.argv[1]
+        
+        if command == 'init':
+            self._init()
+        elif command == 'add':
+            self._add()
+        elif command == 'commit':
+            self._commit()
+        else:
+            sys.stderr.write(f"Error: Unknown command '{command}'\n")
+    
+    def _init(self):
+        try:
+            self.repo.init()
+            print(f"Initialized empty Bit repository in {self.repo.bit_dir}")
+        except FileExistsError:
+            sys.stderr.write("Error: A Bit repository already exists in this directory.\n")
+            
+    def _add(self):
+        if len(sys.argv) < 3:
+            sys.stderr.write("Usage: bit add <file>\n")
+            return
+        
+        if not os.path.exists(self.repo.bit_dir):
+            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
+            return
+        try:
+            self.repo.add(sys.argv[2])
+            print(f"Staged {sys.argv[2]}.")
+        except FileNotFoundError:
+            sys.stderr.write("Error: File not found.\n")
+            
+    def _commit(self):
+        if len(sys.argv) < 4 or sys.argv[2] != '-m':
+            sys.stderr.write("Usage: bit commit -m <message>\n")
+            return
+        
+        if not os.path.exists(self.repo.bit_dir):
+            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
+            return
+        self.repo.commit(sys.argv[3])
+        
+    def _print_usage(self):
+        sys.stderr.write("Usage: bit <command> [<args>]\n")
+        
+if __name__ == "__main__":
+    CLI().run()
