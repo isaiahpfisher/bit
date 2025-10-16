@@ -12,12 +12,12 @@ class Database:
       
       content_bytes = self._encode_content(content)
 
-      sha1 = hashlib.sha1(content_bytes).hexdigest()
-      object_path = os.path.join(self.path, sha1)
+      hash = hashlib.sha1(content_bytes).hexdigest()
+      object_path = os.path.join(self.path, hash)
       if not os.path.exists(object_path):
             with open(object_path, 'wb') as f:
                 f.write(content_bytes)
-      return sha1
+      return hash
   
     def _encode_content(self, content):
         """Encodes the content only if it's not already encoded."""

@@ -12,15 +12,15 @@ class Index:
         if os.path.exists(self.path) and os.path.getsize(self.path) > 0:
             with open(self.path, 'r', encoding='utf-8') as f:
                 for line in f:
-                    sha1, path = line.strip().split(' ', 1)
-                    entries.append({'path': path, 'sha1': sha1})
+                    hash, path = line.strip().split(' ', 1)
+                    entries.append({'path': path, 'hash': hash})
         return entries
     
-    def add(self, path, sha1):
+    def add(self, path, hash):
         """Add or update an entry in the index."""
         entries = self.load()
         entries = [e for e in entries if e['path'] != path]
-        entries.append({'path': path, 'sha1': sha1})
+        entries.append({'path': path, 'hash': hash})
         entries.sort(key=lambda e: e['path'])
         self._write(entries)
 
@@ -38,4 +38,4 @@ class Index:
         """Write a list of entries to the index file."""
         with open(self.path, 'w', encoding='utf-8') as f:
             for entry in entries:
-                f.write(f"{entry['sha1']} {entry['path']}\n")
+                f.write(f"{entry['hash']} {entry['path']}\n")
