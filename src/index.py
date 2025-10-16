@@ -19,10 +19,13 @@ class Index:
     def add(self, path, hash):
         """Add or update an entry in the index."""
         entries = self.load()
-        entries = [e for e in entries if e['path'] != path]
-        entries.append({'path': path, 'hash': hash})
-        entries.sort(key=lambda e: e['path'])
-        self._write(entries)
+        
+        new_entries = [e for e in entries if e['path'] != path]
+        new_entries.append({'path': path, 'hash': hash})
+        new_entries.sort(key=lambda e: e['path'])
+        self._write(new_entries)
+        
+        return len(new_entries) - len(entries)
 
     def clear(self):
         """Clear the index file."""

@@ -31,21 +31,31 @@ class CLI:
             self.repo.init()
             print(f"Initialized empty Bit repository in {self.repo.bit_dir}")
         except FileExistsError:
-            sys.stderr.write("Error: A Bit repository already exists in this directory.\n")
+            sys.stderr.write(f"Error: Bit repository already exists in {self.repo.bit_dir}.\n")
             
     def _add(self):
         if len(sys.argv) < 3:
-            sys.stderr.write("Usage: bit add <file>\n")
+            sys.stderr.write("Usage: bit add <file1> [<file2> ...] | .\n")
             return
         
         if not os.path.exists(self.repo.bit_dir):
             sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
             return
+
+        paths_to_add = sys.argv[2:]
+
         try:
-            self.repo.add(sys.argv[2])
-            print(f"Staged {sys.argv[2]}.")
-        except FileNotFoundError:
-            sys.stderr.write("Error: File not found.\n")
+            if paths_to_add == ['.']:
+                staged_count = self.repo.add_all()
+            else:
+                staged_count = self.repo.add(paths_to_add)
+            
+            if staged_count > 0:
+                print(f"Staged {staged_count} file(s).")
+            else:
+                print("No changes to stage.")
+        except FileNotFoundError as e:
+            sys.stderr.write(f"Error: File not found: {e}\n")
             
     def _commit(self):
         if len(sys.argv) < 4 or sys.argv[2] != '-m':
@@ -58,7 +68,7 @@ class CLI:
         
         commit_hash = self.repo.commit(sys.argv[3])
         if commit_hash:
-            print(f"Committed successfully. Hash: {commit_hash[:7]}") # Show first 7 chars of hash
+            print(f"Committed successfully. Hash: {commit_hash[:7]}")
         else:
             print("Aborted: No changes staged for commit.")
             
