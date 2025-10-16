@@ -6,6 +6,12 @@ class Database:
     
     def __init__(self, path):
         self.path = path
+        
+    def read(self, hash):
+        """Returns the cont content in the db at the given SHA-1 hash."""
+        path = os.path.join(self.path, hash)
+        with open(path, 'rb') as f:
+          return f.read().decode('utf-8')        
 
     def store(self, content):
       """Store content in the db and return its SHA-1 hash."""

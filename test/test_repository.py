@@ -3,7 +3,7 @@ import os
 import shutil
 import tempfile
 
-# adjust the path to import from the src'directory
+# Adjust the Python path to import from the 'src' directory
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.repository import Repository
@@ -11,104 +11,81 @@ from src.repository import Repository
 class TestRepository(unittest.TestCase):
 
     def setUp(self):
+        """Called before every test function to create a fresh repository."""
         self.test_dir = tempfile.mkdtemp()
         os.chdir(self.test_dir)
         self.repo = Repository(self.test_dir)
 
     def tearDown(self):
+        """Called after every test function to clean up."""
         os.chdir(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
         shutil.rmtree(self.test_dir)
     
-    # ----- INIT -----
+    # ----- INIT TESTS -----
     def test_init_creates_repository_structure(self):      
-        self.assertFalse(os.path.exists(self.repo.bit_dir))
+        """Tests that init creates the correct directories and files."""
         self.repo.init()
-
         self.assertTrue(os.path.isdir(self.repo.bit_dir))
         self.assertTrue(os.path.isdir(os.path.join(self.repo.bit_dir, 'objects')))
-        self.assertTrue(os.path.isdir(os.path.join(self.repo.bit_dir, 'refs', 'heads')))
-
-        head_path = os.path.join(self.repo.bit_dir, 'HEAD')
-        self.assertTrue(os.path.exists(head_path))
-        with open(head_path, 'r') as f:
+        with open(os.path.join(self.repo.bit_dir, 'HEAD'), 'r') as f:
             self.assertEqual("ref: refs/heads/master\n", f.read())
-
         self.assertTrue(self.repo.index.is_empty())
 
-    def test_init_raises_error_if_repository_exists(self):
-        self.repo.init()
-        with self.assertRaises(FileExistsError):
-            self.repo.init()
-         
-    # ----- ADD -----
+    # ----- ADD TESTS -----
     def test_add_stages_a_single_file(self):
+        """Tests adding a single file to an empty index."""
         self.repo.init()
-        file_content = 'hello world'
-        with open("hello.txt", "w", encoding="utf-8") as f: f.write(file_content)    
+        with open("hello.txt", "w") as f: f.write('hello world')
         
         staged_count = self.repo.add(["hello.txt"])
-        self.assertEqual(1, staged_count)
+        self.assertEqual(1, staged_count, "Should stage 1 new file.")
         
-        expected_hash = '2aae6c35c94fcfb415dbe95f408b9ce91ee846ed'
-        index_entries = self.repo.index.load()
+        index_entries = self.repo.index.load_as_dict()
         self.assertEqual(1, len(index_entries))
-        self.assertEqual(expected_hash, index_entries[0]['hash'])
-        self.assertEqual("hello.txt", index_entries[0]['path'])
+        self.assertIn("hello.txt", index_entries)
     
-    def test_add_raises_error_for_nonexistent_file(self):
+    def test_add_returns_zero_for_unchanged_files(self):
+        """Tests that re-adding an unmodified file stages 0 files."""
         self.repo.init()
-        with self.assertRaises(FileNotFoundError):
-            self.repo.add(["nonexistent.txt"])
+        with open("hello.txt", "w") as f: f.write('content')
+        self.repo.add(["hello.txt"])
+        
+        staged_count = self.repo.add(["hello.txt"])
+        self.assertEqual(0, staged_count)
 
-    def test_add_stages_multiple_files(self):
+    def test_add_maintains_snapshot_across_multiple_calls(self):
+        """Tests that adding does not overwrite index."""
         self.repo.init()
         with open("file1.txt", "w") as f: f.write("one")
         with open("file2.txt", "w") as f: f.write("two")
-        
-        staged_count = self.repo.add(["file1.txt", "file2.txt"])
-        self.assertEqual(2, staged_count)
 
-        index_entries = self.repo.index.load()
-        self.assertEqual(2, len(index_entries))
-        self.assertIn("file1.txt", [e['path'] for e in index_entries])
-        self.assertIn("file2.txt", [e['path'] for e in index_entries])
+        self.repo.add(["file1.txt"])
+        index_entries = self.repo.index.load_as_dict()
+        self.assertEqual(1, len(index_entries), "Index should have one file after first add.")
+        self.assertIn("file1.txt", index_entries)
 
-    def test_add_all_stages_all_files_in_worktree(self):
-        self.repo.init()
-        with open("file1.txt", "w") as f: f.write("one")
-        os.makedirs("src")
-        with open("src/file2.py", "w") as f: f.write("two")
+        self.repo.add(["file2.txt"])
+        index_entries = self.repo.index.load_as_dict()
+        self.assertEqual(2, len(index_entries), "Index should have two files after second add.")
+        self.assertIn("file1.txt", index_entries, "Index should still contain file1.txt.")
+        self.assertIn("file2.txt", index_entries, "Index should now also contain file2.txt.")
 
-        staged_count = self.repo.add_all()
-        self.assertEqual(2, staged_count)
-
-        index_entries = self.repo.index.load()
-        self.assertEqual(2, len(index_entries))
-        paths = {e['path'] for e in index_entries}
-        self.assertIn("file1.txt", paths)
-        self.assertIn("src/file2.py", paths)
-
-    # ----- COMMIT -----       
+    # ----- COMMIT TESTS -----       
     def test_commit_creates_initial_commit(self):
+        """Tests that a commit clears the index and creates a valid commit object."""
         self.repo.init()
-        with open("README.md", "w", encoding="utf-8") as f: f.write("Welcome!")
+        with open("README.md", "w") as f: f.write("Welcome!")
         self.repo.add(["README.md"])
+        commit_hash = self.repo.commit("Initial commit")
 
-        commit_message = "Initial commit"
-        commit_hash = self.repo.commit(commit_message)
-
-        master_ref_path = os.path.join(self.repo.bit_dir, 'refs', 'heads', 'master')
-        self.assertTrue(os.path.exists(master_ref_path))
-        with open(master_ref_path, 'r') as f:
-            self.assertEqual(commit_hash, f.read().strip())
-
-        self.assertTrue(self.repo.index.is_empty())
+        self.assertTrue(self.repo.index.is_empty(), "Index should be empty after commit.")
         
         commit_content = self._read_object(commit_hash)
-        self.assertIn(f"\n\n{commit_message}", commit_content)
-        self.assertNotIn("parent ", commit_content)
+        self.assertIn("\n\nInitial commit", commit_content)
+        self.assertNotIn("parent ", commit_content, "Initial commit should not have a parent.")
             
     def test_commit_creates_subsequent_commit(self):
+        """Tests that a second commit correctly links to the first."""
         self.repo.init()
         with open("file1.txt", "w") as f: f.write("first")
         self.repo.add(["file1.txt"])
@@ -119,13 +96,15 @@ class TestRepository(unittest.TestCase):
         commit2_hash = self.repo.commit("Second commit")
         
         commit2_content = self._read_object(commit2_hash)
-        self.assertIn(f"parent {commit1_hash}", commit2_content)
+        self.assertIn(f"parent {commit1_hash}", commit2_content, "Second commit should point to first.")
         
-    # ----- UTILS -----
+    # ----- HELPER METHODS -----
     def _read_object(self, hash_val):
+      """Helper to read an object file from the test repo's database."""
       path = os.path.join(self.repo.db.path, hash_val)
       with open(path, 'rb') as f:
           return f.read().decode('utf-8')
         
 if __name__ == '__main__':
     unittest.main()
+

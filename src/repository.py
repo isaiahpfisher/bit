@@ -28,10 +28,16 @@ class Repository:
 
     def add(self, paths):
         """
-        Add one or more files to the index.
-        Raises FileNotFoundError if a path does not exist.
-        Returns the number of files staged.
+        Add one or more files to the index, creating a full snapshot.
+        Returns the number of files actually staged (changed).
         """
+        if self.index.is_empty():
+            head_ref = Ref.from_symbol(self, 'HEAD')
+            head_hash = head_ref.read_hash() if head_ref else None
+            current_entries = Tree.get_index_entries_from_commit(self.db, head_hash)
+        else:
+            current_entries = self.index.load_as_dict()
+        
         staged_count = 0
         for path in paths:
             if not os.path.exists(os.path.join(self.worktree.path, path)):
@@ -40,7 +46,13 @@ class Repository:
             normalized_path = self.worktree.normalize_path(path)
             content = self.worktree.read_file(normalized_path)
             file_hash = self.db.store(content)
-            staged_count += self.index.add(normalized_path, file_hash)
+            
+            if current_entries.get(normalized_path) != file_hash:
+                staged_count += 1
+            
+            current_entries[normalized_path] = file_hash
+
+        self.index.write(current_entries)
         return staged_count
 
     def add_all(self):
@@ -66,3 +78,9 @@ class Repository:
             
         self.index.clear()
         return commit_hash
+    
+    def status(self):
+        last_commit_hash = Ref.from_symbol(self, 'HEAD').read_hash()
+        last_commit_content = self.db.read(last_commit_hash)
+        root_tree_hash = Commit.parse(last_commit_content).tree_hash
+        print(root_tree_hash)

@@ -8,24 +8,31 @@ class Ref:
         self.path = path
         
     def read_hash(self):
+        """Reads the hash from the ref file, returning None if it doesn't exist."""
         if os.path.exists(self.path):
           with open(self.path, 'r') as f:
             return f.read().strip()
         return None
 
     def update(self, new_hash):
+        """Updates the ref file with a new hash."""
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with open(self.path, 'w') as f:
             f.write(new_hash)
             
     @classmethod
     def from_symbol(cls, repo, symbol):
+        """Creates a Ref object by resolving a symbolic ref like 'HEAD'."""
         symbol_path = os.path.join(repo.bit_dir, symbol)
         
         if not os.path.exists(symbol_path):
-            raise FileNotFoundError
+            return None 
         
         with open(symbol_path, 'r') as f:
-            direct_path_str = f.read().strip().split(" ", 1)[1]
-            
-        return Ref(repo, os.path.join(repo.bit_dir, direct_path_str))
+            ref_content = f.read().strip()
+        
+        if ref_content.startswith("ref:"):
+            direct_path_str = ref_content.split(" ", 1)[1]
+            return Ref(repo, os.path.join(repo.bit_dir, direct_path_str))
+        
+        return Ref(repo, symbol_path)

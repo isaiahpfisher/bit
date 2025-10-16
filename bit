@@ -23,6 +23,8 @@ class CLI:
             self._add()
         elif command == 'commit':
             self._commit()
+        elif command == 'status':
+            self._status()
         else:
             sys.stderr.write(f"Error: Unknown command '{command}'\n")
     
@@ -49,13 +51,15 @@ class CLI:
                 staged_count = self.repo.add_all()
             else:
                 staged_count = self.repo.add(paths_to_add)
-            
-            if staged_count > 0:
-                print(f"Staged {staged_count} file(s).")
-            else:
-                print("No changes to stage.")
         except FileNotFoundError as e:
             sys.stderr.write(f"Error: File not found: {e}\n")
+            return
+                
+        if staged_count > 0:
+            print(f"Staged {staged_count} file(s).")
+        else:
+            print("No changes to stage.")
+                
             
     def _commit(self):
         if len(sys.argv) < 4 or sys.argv[2] != '-m':
@@ -68,11 +72,16 @@ class CLI:
         
         commit_hash = self.repo.commit(sys.argv[3])
         if commit_hash:
-            print(f"Committed successfully. Hash: {commit_hash[:7]}")
+            print(f"Hash: {commit_hash[:7]}")
         else:
             print("Aborted: No changes staged for commit.")
             
-            
+    def _status(self):
+        try:
+            self.repo.status()
+            # print(f"Running status command")
+        except FileExistsError:
+            sys.stderr.write(f"Error: Bit repository already exists in {self.repo.bit_dir}.\n")
         
     def _print_usage(self):
         sys.stderr.write("Usage: bit <command> [<args>]\n")

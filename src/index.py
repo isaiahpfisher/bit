@@ -6,26 +6,25 @@ class Index:
     def __init__(self, path):
         self.path = path
 
-    def load(self):
-        """Load the index file into a list of dictionaries."""
-        entries = []
+    def load_as_dict(self):
+        """Load the index file into a dictionary of {path: hash}."""
+        entries = {}
         if os.path.exists(self.path) and os.path.getsize(self.path) > 0:
             with open(self.path, 'r', encoding='utf-8') as f:
                 for line in f:
                     hash, path = line.strip().split(' ', 1)
-                    entries.append({'path': path, 'hash': hash})
+                    entries[path] = hash
         return entries
     
-    def add(self, path, hash):
-        """Add or update an entry in the index."""
-        entries = self.load()
+    def write(self, entries_dict):
+        """Write a dictionary of {path: hash} to the index file."""
+        # Convert dict to list format for sorting and writing
+        entries_list = [{'path': p, 'hash': h} for p, h in entries_dict.items()]
+        entries_list.sort(key=lambda e: e['path'])
         
-        new_entries = [e for e in entries if e['path'] != path]
-        new_entries.append({'path': path, 'hash': hash})
-        new_entries.sort(key=lambda e: e['path'])
-        self._write(new_entries)
-        
-        return len(new_entries) - len(entries)
+        with open(self.path, 'w', encoding='utf-8') as f:
+            for entry in entries_list:
+                f.write(f"{entry['hash']} {entry['path']}\n")
 
     def clear(self):
         """Clear the index file."""
@@ -37,8 +36,3 @@ class Index:
             return True
         return os.path.getsize(self.path) == 0
 
-    def _write(self, entries):
-        """Write a list of entries to the index file."""
-        with open(self.path, 'w', encoding='utf-8') as f:
-            for entry in entries:
-                f.write(f"{entry['hash']} {entry['path']}\n")
