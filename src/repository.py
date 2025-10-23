@@ -103,7 +103,6 @@ class Repository:
         
         head_ref.update(commit_hash)
             
-        self._prepare_index()
         return commit_hash
     
     def status(self):
@@ -117,10 +116,6 @@ class Repository:
         index_entries = self.index.load_as_dict()
         
         all_paths = set(head_entries.keys()) | set(index_entries.keys()) | set(worktree_entries.keys())
-        
-        if 'unique_file.txt' in all_paths:
-            print("unique_file.txt" in index_entries)
-            print("unique_file.txt" in head_entries)
         
         for path in sorted(all_paths):
             in_head = head_entries.get(path)
@@ -147,11 +142,3 @@ class Repository:
                 status.untracked.append(path)
                 
         return status
-                
-    def _prepare_index(self):
-        """Prepares the index for add and status."""
-        if self.index.is_empty():
-            head_ref = Ref.from_symbol(self, 'HEAD')
-            head_hash = head_ref.read_hash() if head_ref else None
-            current_entries = Tree.get_entries_from_commit(self.db, head_hash)
-            self.index.write(current_entries)

@@ -151,7 +151,6 @@ class TestRepository(unittest.TestCase):
         self.repo.add(["README.md"])
         commit_hash = self.repo.commit("Initial commit")
 
-        # self.assertTrue(self.repo.index.is_empty(), "Index should be empty after commit.")
         commit_content = self._read_object(commit_hash)
         self.assertIn("\n\nInitial commit", commit_content)
         self.assertNotIn("parent ", commit_content)
