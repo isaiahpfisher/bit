@@ -28,19 +28,26 @@ class Repository:
         self.index.clear()
     
     def rm(self, path):
+        """Stages a file deletion."""
+
+        normalized_path = self.worktree.normalize_path(path)
+        
+        current_entries = self.index.load_as_dict()
+        
+        if normalized_path not in current_entries:
+             raise FileNotFoundError()
+        
+        self.index.remove(normalized_path)
+        
         full_path = os.path.join(self.worktree.path, path)
         if os.path.exists(full_path):
             os.remove(full_path)
-            self.index.remove(self.worktree.normalize_path(full_path))
-        else:
-            raise FileNotFoundError
 
     def add(self, paths):
         """
         Add one or more files to the index, creating a full snapshot.
         Returns the number of files actually staged (changed).
         """
-        self._prepare_index()
         current_entries = self.index.load_as_dict()
         
         staged_count = 0
@@ -53,6 +60,8 @@ class Repository:
                 if normalized_path in current_entries:
                   del current_entries[normalized_path]
                   staged_count += 1
+                else:
+                    raise FileNotFoundError()
             else:
               content = self.worktree.read_file(normalized_path)
               file_hash = self.db.store(content)
@@ -66,23 +75,17 @@ class Repository:
         return staged_count
 
     def add_all(self):
-        """Stage all files in the worktree."""
-        staged_count = 0
-        worktree_paths = self.worktree.list_files()
-        index_paths = self.index.load_as_list()
+        """
+        "Syncs" the worktree to the index.
+        Stages new files, modifications, and deletions.
+        """
         
-        new_files = list(set(worktree_paths) - set(index_paths))
-        deleted_files = list(set(index_paths) - set(worktree_paths))
-        potentially_modified_files = list(set(worktree_paths) & set(index_paths))
+        worktree_paths = set(self.worktree.list_files())
+        index_paths = set(self.index.load_as_dict().keys())
         
-        staged_count += self.add(new_files)
-        staged_count += self.add(potentially_modified_files)
-        staged_count += len(deleted_files)
+        all_paths_to_check = list(worktree_paths | index_paths)
         
-        for file in deleted_files:
-            self.index.remove(file)
-        
-        return staged_count
+        return self.add(all_paths_to_check)
 
     def commit(self, message):
         """Create a new commit. Returns the commit hash or None."""
@@ -100,37 +103,48 @@ class Repository:
         
         head_ref.update(commit_hash)
             
-        self.index.clear()
+        self._prepare_index()
         return commit_hash
     
     def status(self):
-        """Displays the status of the repository."""
+        """Compares HEAD, index, and worktree. Returns a Status object."""
         status = Status()
-        self._prepare_index()
+        
         
         last_commit_hash = Ref.from_symbol(self, 'HEAD').read_hash()
-        head_entries = Tree.get_entries_from_commit(self.db, last_commit_hash) # files from last commit
-        worktree_entries = self.worktree.list_and_hash_files() # actual working directory
-        index_entries = self.index.load_as_dict() # staging area
+        head_entries = Tree.get_entries_from_commit(self.db, last_commit_hash)
+        worktree_entries = self.worktree.list_and_hash_files()
+        index_entries = self.index.load_as_dict()
         
+        all_paths = set(head_entries.keys()) | set(index_entries.keys()) | set(worktree_entries.keys())
         
-        for file, hash in worktree_entries.items():
-            if file not in index_entries:
-                status.untracked.append(file)
+        if 'unique_file.txt' in all_paths:
+            print("unique_file.txt" in index_entries)
+            print("unique_file.txt" in head_entries)
         
-        for file, hash in index_entries.items():
-            if file in worktree_entries and hash != worktree_entries[file]:
-                status.unstaged[file] = 'modified'
-            elif file not in worktree_entries:
-                status.unstaged[file] = 'deleted'
-            elif file not in head_entries:
-                status.staged[file] = 'new file'
-            elif file in head_entries and hash != head_entries[file]:
-                status.staged[file] = 'modified'
-        
-        for file, hash in head_entries.items():
-            if file not in index_entries:
-                status.staged[file] = 'deleted'
+        for path in sorted(all_paths):
+            in_head = head_entries.get(path)
+            in_index = index_entries.get(path)
+            in_worktree = worktree_entries.get(path)
+
+            # --- Compare Index to HEAD (Staged Changes) ---
+            if in_index and in_index != in_head:
+                if not in_head:
+                    status.staged[path] = 'new file'
+                else:
+                    status.staged[path] = 'modified'
+            elif not in_index and in_head:
+                status.staged[path] = 'deleted'
+
+            # --- Compare Worktree to Index (Unstaged Changes) ---
+            if in_index and in_worktree and in_index != in_worktree:
+                status.unstaged[path] = 'modified'
+            elif in_index and not in_worktree:
+                status.unstaged[path] = 'deleted'
+            
+            # --- Untracked Files ---
+            if not in_index and not in_head and in_worktree:
+                status.untracked.append(path)
                 
         return status
                 

@@ -73,7 +73,7 @@ class CLI:
             self.repo.rm(file_path)
             print(f"File removed: {file_path}.")
         except FileNotFoundError as e:
-            sys.stderr.write(f"Error: File not found: {e}\n")
+            sys.stderr.write(f"Error: File not tracked in index: {e}\n")
             
     def _commit(self):
         if len(sys.argv) < 4 or sys.argv[2] != '-m':
@@ -106,3 +106,5 @@ class CLI:
         
 if __name__ == "__main__":
     CLI().run()
+    
+    # edit
