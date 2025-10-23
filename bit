@@ -86,7 +86,7 @@ class CLI:
         
         commit_hash = self.repo.commit(sys.argv[3])
         if commit_hash:
-            print(f"Hash: {commit_hash[:7]}")
+            print(f"[master {commit_hash[:7]}] {sys.argv[3]}")
         else:
             print("Aborted: No changes staged for commit.")
             
