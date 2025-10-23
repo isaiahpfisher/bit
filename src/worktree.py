@@ -1,4 +1,5 @@
 import os
+import hashlib
 
 class Worktree:
     def __init__(self, path):
@@ -32,4 +33,23 @@ class Worktree:
             for filename in filenames:
                 full_path = os.path.join(root, filename)
                 files.append(self.normalize_path(full_path))
+        return files
+    
+    def list_and_hash_files(self):
+        """
+        Recursively lists all files in the worktree, ignoring the .bit directory.
+        Returns a dictionary of normalized, relative paths, along with their content hashes.
+        """
+        files = {}
+        for root, dirs, filenames in os.walk(self.path):
+            if '.bit' in dirs:
+                dirs.remove('.bit')
+            if '.git' in dirs:
+                dirs.remove('.git') # TODO: .bitignore
+
+            for filename in filenames:
+                full_path = self.normalize_path(os.path.join(root, filename))
+                content = self.read_file(full_path)
+                hash = hashlib.sha1(content).hexdigest()
+                files[full_path] = hash
         return files

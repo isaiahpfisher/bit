@@ -40,7 +40,6 @@ class Tree:
         Helper to create the nested dictionary from a flat dictionary of {path: hash}.
         """
         file_structure = {}
-        # --- THIS IS THE CORRECTED LOOP ---
         for path, hash_val in index_entries_dict.items():
             path_components = path.split('/')
             current_level = file_structure
@@ -51,7 +50,7 @@ class Tree:
         return file_structure
 
     @classmethod
-    def get_index_entries_from_commit(cls, database, commit_hash):
+    def get_entries_from_commit(cls, database, commit_hash):
         """Reads a commit and starts walking the commit tree."""
         if commit_hash is None:
             return {}

@@ -21,6 +21,8 @@ class CLI:
             self._init()
         elif command == 'add':
             self._add()
+        elif command == 'rm':
+            self._rm()
         elif command == 'commit':
             self._commit()
         elif command == 'status':
@@ -59,7 +61,19 @@ class CLI:
             print(f"Staged {staged_count} file(s).")
         else:
             print("No changes to stage.")
-                
+          
+    def _rm(self):
+        if len(sys.argv) < 3:
+            sys.stderr.write("Usage: bit rm <file>\n")
+            return
+
+        file_path = sys.argv[2]
+        
+        try:
+            self.repo.rm(file_path)
+            print(f"File removed: {file_path}.")
+        except FileNotFoundError as e:
+            sys.stderr.write(f"Error: File not found: {e}\n")
             
     def _commit(self):
         if len(sys.argv) < 4 or sys.argv[2] != '-m':
@@ -77,9 +91,13 @@ class CLI:
             print("Aborted: No changes staged for commit.")
             
     def _status(self):
+        if not os.path.exists(self.repo.bit_dir):
+            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
+            return
+        
         try:
-            self.repo.status()
-            # print(f"Running status command")
+            status = self.repo.status()
+            print(status.format_output())
         except FileExistsError:
             sys.stderr.write(f"Error: Bit repository already exists in {self.repo.bit_dir}.\n")
         
