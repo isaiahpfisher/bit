@@ -42,7 +42,6 @@ class Index:
             del entries[path]
             self.write(entries)
           
-        
     def clear(self):
         """Clear the index file."""
         open(self.path, 'w').close()

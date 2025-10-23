@@ -46,24 +46,27 @@ class Repository:
         staged_count = 0
         for path in paths:
             full_path = os.path.join(self.worktree.path, path)
-            if not os.path.exists(full_path):
-                self.index.remove(self.worktree.normalize_path(full_path))
-
             normalized_path = self.worktree.normalize_path(path)
-            content = self.worktree.read_file(normalized_path)
-            file_hash = self.db.store(content)
             
-            if current_entries.get(normalized_path) != file_hash:
-                staged_count += 1
-            
-            current_entries[normalized_path] = file_hash
+            if not os.path.exists(full_path):
+                self.index.remove(normalized_path)
+                if normalized_path in current_entries:
+                  del current_entries[normalized_path]
+                  staged_count += 1
+            else:
+              content = self.worktree.read_file(normalized_path)
+              file_hash = self.db.store(content)
+              
+              if current_entries.get(normalized_path) != file_hash:
+                  staged_count += 1
+              
+              current_entries[normalized_path] = file_hash
 
         self.index.write(current_entries)
         return staged_count
 
     def add_all(self):
         """Stage all files in the worktree."""
-        # return self.add(self.worktree.list_files())
         staged_count = 0
         worktree_paths = self.worktree.list_files()
         index_paths = self.index.load_as_list()
@@ -121,7 +124,7 @@ class Repository:
             elif file not in worktree_entries:
                 status.unstaged[file] = 'deleted'
             elif file not in head_entries:
-                status.staged[file] = 'added'
+                status.staged[file] = 'new file'
             elif file in head_entries and hash != head_entries[file]:
                 status.staged[file] = 'modified'
         
