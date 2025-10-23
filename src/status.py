@@ -42,7 +42,7 @@ class Status:
                 output.append(f"{Colors.RED}\t{path}{Colors.RESET}")
         
         if len(self.staged) == 0:
-          output.append("\nNo changes added to commit (use \"git add\" and/or \"git commit -a\")")
+          output.append("\nNo changes added to commit (use \"git add\")")
         
         output.append("")
         return "\n".join(output)
