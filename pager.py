@@ -5,7 +5,7 @@ import subprocess
 class Pager:
     """Handles displaying text content through a pager like 'less'."""
 
-    def __init__(self, use_pager=False):
+    def __init__(self, use_pager=True):
         self.pager_command = self._find_pager()
         self.use_pager = use_pager
 

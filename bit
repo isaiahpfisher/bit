@@ -1,128 +1,47 @@
 #!/usr/bin/env python3
 import os
 import sys
-from pager import Pager
 from src.repository import Repository
+from commands.add import AddCommand
+from commands.init import InitCommand
+from commands.rm import RmCommand
+from commands.commit import CommitCommand
+from commands.status import StatusCommand
+from commands.log import LogCommand
 
 class CLI:
-    """CLI for Bit."""
-    
     def __init__(self):
         self.repo = Repository(os.getcwd())
-        self.pager = Pager(False)
-        
+        self.commands = {
+            'init': InitCommand,
+            'add': AddCommand,
+            'rm': RmCommand,
+            'commit': CommitCommand,
+            'status': StatusCommand,
+            'log': LogCommand,
+        }
+
     def run(self):
-        """Parse arguments and execute commands."""
         if len(sys.argv) < 2:
             self._print_usage()
             return
 
-        command = sys.argv[1]
-        
-        if command == 'init':
-            self._init()
-        elif command == 'add':
-            self._add()
-        elif command == 'rm':
-            self._rm()
-        elif command == 'commit':
-            self._commit()
-        elif command == 'status':
-            self._status()
-        elif command == 'log':
-            self._log()
+        command_name = sys.argv[1]
+        command_args = sys.argv[2:]
+
+        if command_name in self.commands:
+            CommandClass = self.commands[command_name]
+            command_instance = CommandClass(self.repo, command_args)
+            command_instance.run()
         else:
-            sys.stderr.write(f"Error: Unknown command '{command}'\n")
-    
-    def _init(self):
-        try:
-            self.repo.init()
-            print(f"Initialized empty Bit repository in {self.repo.bit_dir}")
-        except FileExistsError:
-            sys.stderr.write(f"Error: Bit repository already exists in {self.repo.bit_dir}.\n")
-            
-    def _add(self):
-        if len(sys.argv) < 3:
-            sys.stderr.write("Usage: bit add <file1> [<file2> ...] | .\n")
-            return
-        
-        if not os.path.exists(self.repo.bit_dir):
-            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
-            return
+            sys.stderr.write(f"Error: Unknown command '{command_name}'\n")
+            self._print_usage()
 
-        paths_to_add = sys.argv[2:]
-
-        try:
-            if paths_to_add == ['.']:
-                staged_count = self.repo.add_all()
-            else:
-                staged_count = self.repo.add(paths_to_add)
-        except FileNotFoundError as e:
-            sys.stderr.write(f"Error: File not found: {e}\n")
-            return
-                
-        if staged_count > 0:
-            print(f"Staged {staged_count} file(s).")
-        else:
-            print("No changes to stage.")
-          
-    def _rm(self):
-        if len(sys.argv) < 3:
-            sys.stderr.write("Usage: bit rm <file>\n")
-            return
-
-        file_path = sys.argv[2]
-        
-        try:
-            self.repo.rm(file_path)
-            print(f"File removed: {file_path}.")
-        except FileNotFoundError as e:
-            sys.stderr.write(f"Error: File not tracked in index: {e}\n")
-            
-    def _commit(self):
-        if len(sys.argv) < 4 or sys.argv[2] != '-m':
-            sys.stderr.write("Usage: bit commit -m <message>\n")
-            return
-        
-        if not os.path.exists(self.repo.bit_dir):
-            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
-            return
-        
-        commit_hash = self.repo.commit(sys.argv[3])
-        if commit_hash:
-            print(f"[master {commit_hash[:7]}] {sys.argv[3]}")
-        else:
-            print("Aborted: No changes staged for commit.")
-            
-    def _status(self):
-        if not os.path.exists(self.repo.bit_dir):
-            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
-            return
-        
-        status = self.repo.status()
-        print(status.format_output())
-        
-            
-    def _log(self):
-        """Displays the commit history using a pager."""
-        if not os.path.exists(self.repo.bit_dir):
-            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
-            return
-
-        logs = self.repo.log()
-        
-        if not logs:
-            print("No commits yet.")
-            return
-
-        full_output = ""
-        for log in logs:
-            full_output += log.format()
-            
-        self.pager.display(full_output)
-        
     def _print_usage(self):
         sys.stderr.write("Usage: bit <command> [<args>]\n")
-        
+        sys.stderr.write("Available commands:\n")
+        for name in self.commands:
+             sys.stderr.write(f"  {name}\n")
+
 if __name__ == "__main__":
     CLI().run()
