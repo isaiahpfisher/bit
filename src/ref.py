@@ -39,6 +39,31 @@ class Ref:
         return Ref(repo, symbol_path)
     
     @classmethod
+    def for_branch(cls, repo, branch, hash):
+        """Creates a Ref object in refs/heads for the given branch."""
+        path = os.path.join(repo.bit_dir, 'refs', 'heads', branch)
+        
+        if (os.path.exists(path)):
+            raise FileExistsError("Branch already exists")
+        
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(hash)
+            
+    @staticmethod
+    def list_all(repo):
+        refs_dir = os.path.join(repo.bit_dir, 'refs', 'heads')
+        refs = []
+        
+        if os.path.isdir(refs_dir):
+          for dir in os.listdir(refs_dir):
+              refs.append(dir)
+        else:
+            raise FileNotFoundError
+        
+        return refs
+
+    @classmethod
     def load_all_as_dict(cls, repo):
         refs_dir = os.path.join(repo.bit_dir, 'refs', 'heads')
         refs = {}

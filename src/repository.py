@@ -160,4 +160,15 @@ class Repository:
           last_commit_hash = last_commit.parent_hash
         
         return logs
+
+    def branch(self, branch):
+        head_ref = Ref.from_symbol(self, 'HEAD')
+        hash = head_ref.read_hash()
         
+        if hash:
+          Ref.for_branch(self, branch, hash)
+        else:
+            raise Exception("Not a valid object name")
+        
+    def list_branches(self):
+        return Ref.list_all(self)

@@ -8,6 +8,7 @@ class Pager:
     def __init__(self, use_pager=True):
         self.pager_command = self._find_pager()
         self.use_pager = use_pager
+        self.content = []
 
     def _find_pager(self):
         """Determines the pager command to use."""
@@ -18,8 +19,12 @@ class Pager:
             if '-R' not in pager_cmd: pager_cmd.append('-R')
             if '-F' not in pager_cmd: pager_cmd.append('-F')
         return pager_cmd
+    
+    def append_line(self, line):
+        self.content.append(line)
 
-    def display(self, content):
+    def display(self):
+        content = '\n'.join(self.content)
         """Displays the given content using the pager if possible."""
         # Only use pager if output is to a real terminal
         if not self.use_pager or not sys.stdout.isatty():
@@ -40,6 +45,7 @@ class Pager:
 
         except FileNotFoundError:
             # Pager command not found, fall back to simple printing
+            print("ERROR")
             print(content)
         except KeyboardInterrupt:
             # User pressed Ctrl-C
@@ -51,3 +57,6 @@ class Pager:
                      pager_proc.stdin.close()
                  except (IOError, BrokenPipeError):
                      pass # Already closed or broken pipe
+    
+    def clear(self):
+        self.content = []

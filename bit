@@ -8,6 +8,7 @@ from commands.rm import RmCommand
 from commands.commit import CommitCommand
 from commands.status import StatusCommand
 from commands.log import LogCommand
+from commands.branch import BranchCommand
 
 class CLI:
     def __init__(self):
@@ -19,6 +20,7 @@ class CLI:
             'commit': CommitCommand,
             'status': StatusCommand,
             'log': LogCommand,
+            'branch': BranchCommand,
         }
 
     def run(self):

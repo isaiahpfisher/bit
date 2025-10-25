@@ -16,8 +16,7 @@ class LogCommand(BaseCommand):
             print("No commits yet.")
             return
 
-        full_output = ""
         for log_entry in logs:
-            full_output += log_entry.format() + '\n'
+            self.pager.append_line(log_entry.format() + '\n')
             
-        self.pager.display(full_output)
+        self.pager.display()

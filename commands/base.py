@@ -1,9 +1,10 @@
 import sys
 import os
+from src.repository import Repository
 from abc import ABC, abstractmethod
 
 class BaseCommand(ABC):
-    def __init__(self, repo, args):
+    def __init__(self, repo: Repository, args):
         self.repo = repo
         self.args = args
 
