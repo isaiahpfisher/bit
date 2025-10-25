@@ -16,16 +16,21 @@ class Database:
     def store(self, content):
       """Store content in the db and return its SHA-1 hash."""
       
-      content_bytes = self._encode_content(content)
-
-      hash = hashlib.sha1(content_bytes).hexdigest()
+      content_bytes = self.encode_content(content)
+      hash = self.hash_content(content)
       object_path = os.path.join(self.path, hash)
       if not os.path.exists(object_path):
             with open(object_path, 'wb') as f:
                 f.write(content_bytes)
       return hash
   
-    def _encode_content(self, content):
+    @classmethod
+    def hash_content(cls, content):
+        content_bytes = cls.encode_content(content)
+        return hashlib.sha1(content_bytes).hexdigest()
+  
+    @classmethod
+    def encode_content(cls, content):
         """Encodes the content only if it's not already encoded."""
         return content.encode('utf-8') if isinstance(content, str) else content
         

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+from pager import Pager
 from src.repository import Repository
 
 class CLI:
@@ -8,6 +9,7 @@ class CLI:
     
     def __init__(self):
         self.repo = Repository(os.getcwd())
+        self.pager = Pager(False)
         
     def run(self):
         """Parse arguments and execute commands."""
@@ -27,6 +29,8 @@ class CLI:
             self._commit()
         elif command == 'status':
             self._status()
+        elif command == 'log':
+            self._log()
         else:
             sys.stderr.write(f"Error: Unknown command '{command}'\n")
     
@@ -95,16 +99,30 @@ class CLI:
             sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
             return
         
-        try:
-            status = self.repo.status()
-            print(status.format_output())
-        except FileExistsError:
-            sys.stderr.write(f"Error: Bit repository already exists in {self.repo.bit_dir}.\n")
+        status = self.repo.status()
+        print(status.format_output())
+        
+            
+    def _log(self):
+        """Displays the commit history using a pager."""
+        if not os.path.exists(self.repo.bit_dir):
+            sys.stderr.write("Error: Not a Bit repository. Run 'bit init' first.\n")
+            return
+
+        logs = self.repo.log()
+        
+        if not logs:
+            print("No commits yet.")
+            return
+
+        full_output = ""
+        for log in logs:
+            full_output += log.format()
+            
+        self.pager.display(full_output)
         
     def _print_usage(self):
         sys.stderr.write("Usage: bit <command> [<args>]\n")
         
 if __name__ == "__main__":
     CLI().run()
-    
-    # edit

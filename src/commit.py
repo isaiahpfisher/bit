@@ -1,4 +1,5 @@
 import time
+from .formatter import Formatter
 
 class Commit:
     """Represents a commit object."""

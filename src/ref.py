@@ -6,6 +6,7 @@ class Ref:
     def __init__(self, repo, path):
         self.repo = repo
         self.path = path
+        self.name = path.split('/')[-1]
         
     def read_hash(self):
         """Reads the hash from the ref file, returning None if it doesn't exist."""
@@ -36,3 +37,17 @@ class Ref:
             return Ref(repo, os.path.join(repo.bit_dir, direct_path_str))
         
         return Ref(repo, symbol_path)
+    
+    @classmethod
+    def load_all_as_dict(cls, repo):
+        refs_dir = os.path.join(repo.bit_dir, 'refs', 'heads')
+        refs = {}
+        
+        if os.path.isdir(refs_dir):
+          for dir in os.listdir(refs_dir):
+              ref = Ref(repo, os.path.join(refs_dir, dir))
+              refs[dir] = ref.read_hash()
+        else:
+            raise FileNotFoundError
+        
+        return refs

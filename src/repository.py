@@ -6,7 +6,7 @@ from .ref import Ref
 from .tree import Tree
 from .worktree import Worktree
 from .status import Status
-
+from .log import Log
 class Repository:
     """Represents a Bit repository."""
     
@@ -142,3 +142,22 @@ class Repository:
                 status.untracked.append(path)
                 
         return status
+    
+    def log(self):
+        """Returns full commit history starting at HEAD."""
+        logs = []
+        all_refs = Ref.load_all_as_dict(self)
+        head_ref = Ref.from_symbol(self, 'HEAD')
+        last_commit_hash = head_ref.read_hash()
+        
+        
+        while last_commit_hash:
+          last_commit_content = self.db.read(last_commit_hash)
+          last_commit = Commit.parse(last_commit_content)
+          refs = [ branch for branch, commit_hash in all_refs.items() if commit_hash == last_commit_hash ]
+          log = Log(last_commit_hash, last_commit, head_ref, refs)
+          logs.append(log)
+          last_commit_hash = last_commit.parent_hash
+        
+        return logs
+        
