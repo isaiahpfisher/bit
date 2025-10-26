@@ -7,6 +7,12 @@ class BaseCommand(ABC):
     def __init__(self, repo: Repository, args):
         self.repo = repo
         self.args = args
+        
+    def base_run(self):
+        try:
+            self.run()
+        except Exception as e:
+            sys.stderr.write(f"Error: {e}\n")
 
     @abstractmethod
     def run(self):

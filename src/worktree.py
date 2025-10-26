@@ -17,6 +17,18 @@ class Worktree:
         """Reads a file from the worktree."""
         with open(os.path.join(self.path, path), 'rb') as f:
             return f.read()
+    
+    def write_file(self, path, content):
+        """Writes to a file in the worktree."""
+        full_path = os.path.join(self.path, path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, 'w') as f:
+            f.write(content)
+            
+    def remove_file(self, path):
+        print("Removing:", path)
+    
+    # ----- UTILS -----
         
     def list_files(self):
         """

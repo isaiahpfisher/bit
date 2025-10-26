@@ -39,8 +39,17 @@ class Ref:
         return Ref(repo, symbol_path)
     
     @classmethod
-    def for_branch(cls, repo, branch, hash):
-        """Creates a Ref object in refs/heads for the given branch."""
+    def from_branch(cls, repo, branch):
+        path = os.path.join(repo.bit_dir, 'refs', 'heads', branch)
+        
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Could not find ref for branch '{branch}'")
+                
+        return Ref(repo, path)
+    
+    @classmethod
+    def new_branch(cls, repo, branch, hash):
+        """Create a new ref in refs/heads for the given branch and returns a Ref."""
         path = os.path.join(repo.bit_dir, 'refs', 'heads', branch)
         
         if (os.path.exists(path)):
@@ -49,6 +58,8 @@ class Ref:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
             f.write(hash)
+        
+        return Ref(repo, path)
             
     @staticmethod
     def list_all(repo):

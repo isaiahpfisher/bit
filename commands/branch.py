@@ -16,7 +16,4 @@ class BranchCommand(BaseCommand):
                 
             self.pager.display()
         else:
-            try:  
-              self.repo.branch(self.args[0])
-            except Exception as e:
-                print(f"Error: {e}")
+            self.repo.branch(self.args[0])

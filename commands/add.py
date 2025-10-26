@@ -12,14 +12,10 @@ class AddCommand(BaseCommand):
 
         paths_to_add = self.args
 
-        try:
-            if paths_to_add == ['.']:
-                staged_count = self.repo.add_all()
-            else:
-                staged_count = self.repo.add(paths_to_add)
-        except FileNotFoundError as e:
-            sys.stderr.write(f"Error: {e}\n")
-            return
+        if paths_to_add == ['.']:
+            staged_count = self.repo.add_all()
+        else:
+            staged_count = self.repo.add(paths_to_add)
                 
         if staged_count > 0:
             print(f"Staged {staged_count} file(s).")

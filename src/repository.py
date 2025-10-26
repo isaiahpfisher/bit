@@ -166,9 +166,31 @@ class Repository:
         hash = head_ref.read_hash()
         
         if hash:
-          Ref.for_branch(self, branch, hash)
+          Ref.new_branch(self, branch, hash)
         else:
             raise Exception("Not a valid object name")
         
     def list_branches(self):
         return Ref.list_all(self)
+    
+    def checkout(self, branch):
+        current_head = Ref.from_symbol(self, "HEAD")
+        target_head = Ref.from_branch(self, branch)
+        
+        with open(os.path.join(self.bit_dir, "HEAD"), "w") as f:
+            f.write(f"ref: refs/heads/{branch}\n")
+            
+        current_entries = Tree.get_entries_from_commit(self.db, current_head.read_hash())
+        target_entries = Tree.get_entries_from_commit(self.db, target_head.read_hash())
+        
+        for path, hash in target_entries.items():
+            content = self.db.read(hash)
+            print(path, hash)
+            self.worktree.write_file(path, content)
+        
+        for path, hash in current_entries.items():
+            if path not in target_entries:
+                self.worktree.remove_file(path)
+        
+        
+        self.index.write(target_entries)
