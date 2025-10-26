@@ -39,9 +39,7 @@ class Repository:
         
         self.index.remove(normalized_path)
         
-        full_path = os.path.join(self.worktree.path, path)
-        if os.path.exists(full_path):
-            os.remove(full_path)
+        self.worktree.remove_file(path)
 
     def add(self, paths):
         """
@@ -152,8 +150,8 @@ class Repository:
         
         
         while last_commit_hash:
-          last_commit_content = self.db.read(last_commit_hash)
-          last_commit = Commit.parse(last_commit_content)
+          last_commit_content_bytes = self.db.read(last_commit_hash)
+          last_commit = Commit.parse(last_commit_content_bytes)
           refs = [ branch for branch, commit_hash in all_refs.items() if commit_hash == last_commit_hash ]
           log = Log(last_commit_hash, last_commit, head_ref, refs)
           logs.append(log)
@@ -162,6 +160,9 @@ class Repository:
         return logs
 
     def branch(self, branch):
+        if '/' in branch:
+            raise ValueError("Branch names cannot contain forward slashes (/)")
+            
         head_ref = Ref.from_symbol(self, 'HEAD')
         hash = head_ref.read_hash()
         
@@ -177,6 +178,14 @@ class Repository:
         current_head = Ref.from_symbol(self, "HEAD")
         target_head = Ref.from_branch(self, branch)
         
+        if current_head.name == target_head.name:
+            raise Exception(f"Already on branch '{branch}'")
+        
+        status = self.status()
+        
+        if not status.is_clean():
+            raise Exception(f"Please stash or commit your changes before switching branches.")
+        
         with open(os.path.join(self.bit_dir, "HEAD"), "w") as f:
             f.write(f"ref: refs/heads/{branch}\n")
             
@@ -185,12 +194,10 @@ class Repository:
         
         for path, hash in target_entries.items():
             content = self.db.read(hash)
-            print(path, hash)
             self.worktree.write_file(path, content)
         
         for path, hash in current_entries.items():
             if path not in target_entries:
                 self.worktree.remove_file(path)
-        
         
         self.index.write(target_entries)

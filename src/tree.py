@@ -55,8 +55,8 @@ class Tree:
         if commit_hash is None:
             return {}
             
-        commit_data = database.read(commit_hash)
-        commit = Commit.parse(commit_data)
+        commit_data_bytes = database.read(commit_hash)
+        commit = Commit.parse(commit_data_bytes)
         root_tree_hash = commit.tree_hash
         
         return cls._walk_tree(database, root_tree_hash, "")
@@ -65,7 +65,8 @@ class Tree:
     def _walk_tree(cls, database, tree_hash, current_path):
         """Recursively walks tree objects to build a flat dict of {path: hash}."""
         entries = {}
-        tree_content = database.read(tree_hash)
+        tree_content_bytes = database.read(tree_hash)
+        tree_content = tree_content_bytes.decode('utf-8')
 
         for line in tree_content.splitlines():
             type, hash_val, name = line.split(' ', 2)

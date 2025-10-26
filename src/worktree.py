@@ -1,4 +1,5 @@
 import os
+import sys
 import hashlib
 
 class Worktree:
@@ -18,15 +19,33 @@ class Worktree:
         with open(os.path.join(self.path, path), 'rb') as f:
             return f.read()
     
-    def write_file(self, path, content):
+    def write_file(self, path, content_bytes):
         """Writes to a file in the worktree."""
         full_path = os.path.join(self.path, path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'w') as f:
-            f.write(content)
+        with open(full_path, 'wb') as f:
+            f.write(content_bytes)
             
     def remove_file(self, path):
-        print("Removing:", path)
+        """Removes a file and any newly empty parent directories up to the root."""
+        full_path = os.path.join(self.path, path.replace('/', os.sep))
+        parent_dir = os.path.dirname(full_path)
+        
+        if not os.path.exists(full_path):
+            return
+        
+        try:
+            os.remove(full_path)
+            while parent_dir != self.path and os.path.exists(parent_dir):
+                if not os.listdir(parent_dir):
+                    os.rmdir(parent_dir)
+                    parent_dir = os.path.dirname(parent_dir)
+                else:
+                    break
+        except FileNotFoundError:
+             pass 
+        except OSError as e:
+            print(f"Warning: Could not remove file {full_path}: {e}", file=sys.stderr)
     
     # ----- UTILS -----
         

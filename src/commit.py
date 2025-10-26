@@ -26,8 +26,8 @@ class Commit:
       return f"{metadata}\n\n{self.message}"
 
     @classmethod
-    def parse(cls, raw_data):
-        
+    def parse(cls, raw_data_bytes):
+        raw_data = raw_data_bytes.decode('utf-8')
         try:
             header, message = raw_data.split('\n\n', 1)
         except ValueError:
