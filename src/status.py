@@ -10,9 +10,9 @@ class Status:
         """Checks if there are any changes to report."""
         return not self.staged and not self.unstaged and not self.untracked
 
-    def format_output(self):
+    def format_output(self, branch):
         """Generates the user-friendly string for the console."""
-        output = ["On branch master"] # TODO
+        output = [f"On branch {branch}"]
 
         if self.is_clean():
             output.append("Nothing to commit, working tree clean")

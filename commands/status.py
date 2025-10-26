@@ -7,4 +7,4 @@ class StatusCommand(BaseCommand):
             return
         
         status = self.repo.status()
-        print(status.format_output())
+        print(status.format_output(self.repo.current_branch()))

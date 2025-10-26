@@ -201,3 +201,7 @@ class Repository:
                 self.worktree.remove_file(path)
         
         self.index.write(target_entries)
+        
+    # ----- UTILS -----
+    def current_branch(self):
+        return Ref.from_symbol(self, "HEAD").name

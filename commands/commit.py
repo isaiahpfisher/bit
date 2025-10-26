@@ -14,7 +14,6 @@ class CommitCommand(BaseCommand):
         commit_hash = self.repo.commit(message)
         
         if commit_hash:
-            # TODO: Get current branch name dynamically
-            print(f"[master {commit_hash[:7]}] {message}") 
+            print(f"[{self.repo.current_branch()} {commit_hash[:7]}] {message}") 
         else:
             print("Aborted: No changes staged for commit.")
