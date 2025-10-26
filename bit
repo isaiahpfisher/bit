@@ -10,6 +10,7 @@ from commands.status import StatusCommand
 from commands.log import LogCommand
 from commands.branch import BranchCommand
 from commands.checkout import CheckoutCommand
+from commands.diff import DiffCommand
 
 class CLI:
     def __init__(self):
@@ -23,6 +24,7 @@ class CLI:
             'log': LogCommand,
             'branch': BranchCommand,
             'checkout': CheckoutCommand,
+            'diff': DiffCommand,
         }
 
     def run(self):
@@ -36,7 +38,11 @@ class CLI:
         if command_name in self.commands:
             CommandClass = self.commands[command_name]
             command_instance = CommandClass(self.repo, command_args)
-            command_instance.base_run()
+            try:
+                command_instance.run()
+            except Exception as e:
+                sys.stderr.write(f"Error: {e}\n")
+                
         else:
             sys.stderr.write(f"Error: Unknown command '{command_name}'\n")
             self._print_usage()

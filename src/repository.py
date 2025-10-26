@@ -7,6 +7,8 @@ from .tree import Tree
 from .worktree import Worktree
 from .status import Status
 from .log import Log
+from .diff_calculator import DiffCalculator
+
 class Repository:
     """Represents a Bit repository."""
     
@@ -59,7 +61,7 @@ class Repository:
                   del current_entries[normalized_path]
                   staged_count += 1
                 else:
-                    raise FileNotFoundError()
+                    raise FileNotFoundError(f"Could not find file '{normalized_path}'")
             else:
               content = self.worktree.read_file(normalized_path)
               file_hash = self.db.store(content)
@@ -201,6 +203,13 @@ class Repository:
                 self.worktree.remove_file(path)
         
         self.index.write(target_entries)
+        
+    def diff(self):
+        return DiffCalculator.calculate_index_vs_worktree(self)
+        
+    def diff_staged(self):
+        return DiffCalculator.calculate_index_vs_head(self)
+        
         
     # ----- UTILS -----
     def current_branch(self):

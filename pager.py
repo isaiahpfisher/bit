@@ -23,8 +23,8 @@ class Pager:
     def append_line(self, line):
         self.content.append(line)
 
-    def display(self):
-        content = '\n'.join(self.content)
+    def display(self, raw_content=None):
+        content = raw_content if raw_content else '\n'.join(self.content)
         """Displays the given content using the pager if possible."""
         # Only use pager if output is to a real terminal
         if not self.use_pager or not sys.stdout.isatty():
