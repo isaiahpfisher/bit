@@ -11,8 +11,12 @@ class BranchCommand(BaseCommand):
             return
 
         if len(self.args) == 0:
+            current_branch = self.repo.current_branch()
             for branch in self.repo.list_branches():
-                self.pager.append_line(branch)
+                if branch != current_branch:
+                  self.pager.append_line(f"  {branch}")
+                else:
+                    self.pager.append_line(f"* {branch}")
                 
             self.pager.display()
         else:

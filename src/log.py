@@ -10,6 +10,8 @@ class Log:
     def format(self):
         lines = []
         lines.append(f"{Formatter.YELLOW}commit {self.hash} {self._decorate()}{Formatter.RESET}")
+        if len(self.commit.parent_hashes) > 1:
+            print("Merge:", " ".join(self.commit.parent_hashes))
         lines.append(f"Author: {self.commit.author}")
         lines.append(f"Date: {Formatter.format_timestamp(self.commit.timestamp)}")
         lines.append(f"\n    {self.commit.message}\n")

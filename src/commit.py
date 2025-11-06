@@ -4,9 +4,9 @@ from .formatter import Formatter
 class Commit:
     """Represents a commit object."""
     
-    def __init__(self, tree_hash, parent_hash, message, author="Isaiah Fisher", email="isaiahpfisher@gmail.com", timestamp=None, timezone=None, committer_name=None, committer_email=None):
+    def __init__(self, tree_hash, parent_hashes, message, author="Isaiah Fisher", email="isaiahpfisher@gmail.com", timestamp=None, timezone=None, committer_name=None, committer_email=None):
         self.tree_hash = tree_hash
-        self.parent_hash = parent_hash
+        self.parent_hashes = parent_hashes
         self.message = message
         self.author = author
         self.email = email
@@ -17,8 +17,9 @@ class Commit:
 
     def serialize(self):
       lines = [f"tree {self.tree_hash}"]
-      if self.parent_hash:
-          lines.append(f"parent {self.parent_hash}")
+      if self.parent_hashes:
+          for hash in self.parent_hashes:
+            lines.append(f"parent {hash}")
       lines.append(f"author {self.author} <{self.email}> {self.timestamp} {self.timezone}")
       lines.append(f"committer {self.committer_name} <{self.committer_email}> {self.timestamp} {self.timezone}")
       
@@ -28,25 +29,36 @@ class Commit:
     @classmethod
     def parse(cls, raw_data_bytes):
         raw_data = raw_data_bytes.decode('utf-8')
+
         try:
             header, message = raw_data.split('\n\n', 1)
         except ValueError:
             header = raw_data
             message = ""
-            
-        header_data = {}
+
+        tree_hash = None
+        parent_hashes = []
+        author_line = None
+        committer_line = None
+
         for line in header.splitlines():
             key, value = line.split(' ', 1)
-            header_data[key] = value
-            
-        tree_hash = header_data.get('tree')
-        parent_hash = header_data.get('parent')
-        author, email, timestamp, timezone = cls._parse_person_line(header_data.get('author'))
-        committer_name, committer_email, _, _ = cls._parse_person_line(header_data.get('committer'))
-        
+
+            if key == "tree":
+                tree_hash = value
+            elif key == "parent":
+                parent_hashes.append(value)
+            elif key == "author":
+                author_line = value
+            elif key == "committer":
+                committer_line = value
+
+        author, email, timestamp, timezone = cls._parse_person_line(author_line)
+        committer_name, committer_email, _, _ = cls._parse_person_line(committer_line)
+
         return cls(
             tree_hash=tree_hash,
-            parent_hash=parent_hash,
+            parent_hashes=parent_hashes,   # ✅ Correct list argument
             message=message,
             author=author,
             email=email,
@@ -55,6 +67,7 @@ class Commit:
             committer_name=committer_name,
             committer_email=committer_email
         )
+
     
     # ----- UTILS -----
     @staticmethod

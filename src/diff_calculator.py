@@ -26,9 +26,26 @@ class DiffCalculator:
         index_entries = repo.index.load_as_dict()
         
         return cls._calculate_original_vs_new(repo, head_entries, index_entries, include_added_files=True)
+    
+    @classmethod
+    def calculate_file_vs_file(cls, repo, path, hash_a, hash_b, n = 3) -> FileDiff:
+        """
+        Calculates and returns the file diff for the given hashes.
+        """
+        blob_a_bytes = repo.db.read(hash_a)
+        blob_b_bytes = repo.db.read(hash_b)
+        
+        diff_lines = cls._generate_unified_diff(blob_a_bytes, blob_b_bytes, path, n)
+        
+        return FileDiff(
+            path=path, 
+            status='modified', 
+            lines=diff_lines,
+            hash_a=hash_a,
+            hash_b=hash_b
+            )
 
     # --- UTILS ---
-    
     @classmethod
     def _calculate_original_vs_new(cls, repo, original, new, include_added_files=False):
         all_paths = set(original.keys()) | set(new.keys())
@@ -81,7 +98,7 @@ class DiffCalculator:
         return results
     
     @classmethod
-    def _generate_unified_diff(cls, blob_a_bytes, blob_b_bytes, path):
+    def _generate_unified_diff(cls, blob_a_bytes, blob_b_bytes, path, n = 3):
         """Generates raw unified diff lines between two blob contents (bytes)."""
         lines_a = blob_a_bytes.decode('utf-8', errors='replace').splitlines(keepends=True)
         lines_b = blob_b_bytes.decode('utf-8', errors='replace').splitlines(keepends=True)
@@ -91,7 +108,8 @@ class DiffCalculator:
             lines_b,
             fromfile=f"a/{path}",
             tofile=f"b/{path}",
-            lineterm='\n'
+            lineterm='\n',
+            n=0
         )
         
         diff_lines = list(diff_generator)

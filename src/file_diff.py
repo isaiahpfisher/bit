@@ -1,5 +1,5 @@
 from .formatter import Formatter
-
+from .hunk import Hunk
 class FileDiff:
     def __init__(self, path, status, lines, hash_a, hash_b):
         self.path = path
@@ -7,6 +7,31 @@ class FileDiff:
         self.lines = lines
         self.hash_a = hash_a
         self.hash_b = hash_b
+        
+    def conflicts_with(self, other: 'FileDiff') -> bool:
+        if self.path != other.path:
+            return False
+        
+        for self_hunk in self.get_hunks():
+            for other_hunk in other.get_hunks():
+                if self_hunk.conflits_with(other_hunk):
+                    return True
+        
+        return False
+    
+    def get_hunks(self) -> list[Hunk]:
+        hunks = []
+        hunk_lines = []
+        
+        for line in self.lines:
+            if line.startswith('@@') and hunk_lines:
+                hunks.append(Hunk.parse_diff_lines(self, hunk_lines))
+                hunk_lines = [line]
+            else:
+                hunk_lines.append(line)
+        
+        hunks.append(Hunk.parse_diff_lines(self, hunk_lines))
+        return hunks
     
     def format_file_header(self):
         """Formats the header lines for the diff."""

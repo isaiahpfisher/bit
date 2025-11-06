@@ -8,6 +8,7 @@ from .worktree import Worktree
 from .status import Status
 from .log import Log
 from .diff_calculator import DiffCalculator
+from .merge import Merge
 
 class Repository:
     """Represents a Bit repository."""
@@ -89,7 +90,8 @@ class Repository:
 
     def commit(self, message):
         """Create a new commit. Returns the commit hash or None."""
-        if self.index.is_empty():
+        status = self.status()
+        if self.index.is_empty() and not status.staged:
             return None
         
         root_tree = Tree.build_from_index(self.index, self.db)
@@ -97,7 +99,7 @@ class Repository:
         head_ref = Ref.from_symbol(self, 'HEAD')
         parent_hash = head_ref.read_hash()
         
-        commit = Commit(root_tree.hash, parent_hash, message)
+        commit = Commit(root_tree.hash, [parent_hash], message)
         commit_content = commit.serialize()
         commit_hash = self.db.store(commit_content)
         
@@ -144,20 +146,24 @@ class Repository:
         return status
     
     def log(self):
-        """Returns full commit history starting at HEAD."""
+        """Return linear commit history following the first-parent chain."""
         logs = []
         all_refs = Ref.load_all_as_dict(self)
         head_ref = Ref.from_symbol(self, 'HEAD')
-        last_commit_hash = head_ref.read_hash()
+        commit_hash = head_ref.read_hash()
         
-        
-        while last_commit_hash:
-          last_commit_content_bytes = self.db.read(last_commit_hash)
-          last_commit = Commit.parse(last_commit_content_bytes)
-          refs = [ branch for branch, commit_hash in all_refs.items() if commit_hash == last_commit_hash ]
-          log = Log(last_commit_hash, last_commit, head_ref, refs)
-          logs.append(log)
-          last_commit_hash = last_commit.parent_hash
+        while commit_hash:
+            commit_bytes = self.db.read(commit_hash)
+            commit = Commit.parse(commit_bytes)
+
+            refs = [branch for branch, h in all_refs.items() if h == commit_hash]
+
+            logs.append(Log(commit_hash, commit, head_ref, refs))
+
+            if commit.parent_hashes:
+                commit_hash = commit.parent_hashes[0]
+            else:
+                commit_hash = None
         
         return logs
 
@@ -209,6 +215,21 @@ class Repository:
         
     def diff_staged(self):
         return DiffCalculator.calculate_index_vs_head(self)
+    
+    def merge(self, branch_to_merge):
+        
+        status = self.status()
+        
+        if not status.is_clean():
+            # raise Exception(f"Please stash or commit your changes before switching branches.")
+            pass
+        
+        other_ref = Ref.from_branch(self, branch_to_merge)
+        head_ref = Ref.from_symbol(self, "HEAD")
+        
+        merge = Merge(self, head_ref, other_ref)
+        
+        merge.attempt() 
         
         
     # ----- UTILS -----
