@@ -651,6 +651,70 @@ class TestRepository(unittest.TestCase):
         status = self.repo.status()
         for path in status.untracked:
             self.assertFalse(path.startswith(".bit"), f"Found internal file in status: {path}")
+            
+    # ----- RESTORE TESTS -----
+    def test_restore_worktree_reverts_to_index(self):
+        """Tests bit restore <file> reverts worktree to match the index."""
+        self._write_file("file.txt", "index version")
+        self.repo.add(["file.txt"])
+        
+        # Modify the file in the worktree
+        self._write_file("file.txt", "dirty version")
+        self.assertEqual("dirty version", self._read_worktree_file_str("file.txt"))
+        
+        # Restore from index
+        self.repo.restore(["file.txt"], staged=False)
+        
+        # Verify it matches index version
+        self.assertEqual("index version", self._read_worktree_file_str("file.txt"))
+
+    def test_restore_staged_reverts_index_to_head(self):
+        """Tests bit restore --staged <file> reverts index to match HEAD."""
+        self._write_file("file.txt", "head version")
+        self.repo.add(["file.txt"])
+        self.repo.commit("initial")
+        
+        # Modify and stage a new version
+        self._write_file("file.txt", "staged version")
+        self.repo.add(["file.txt"])
+        
+        # Unstage the file
+        self.repo.restore(["file.txt"], staged=True)
+        
+        # Verify index now matches HEAD hash
+        index_entries = self.repo.index.load_as_dict()
+        head_hash = self.repo.db.hash_content("head version")
+        self.assertEqual(head_hash, index_entries["file.txt"])
+        
+        # Verify worktree is still "staged version" (not overwritten)
+        self.assertEqual("staged version", self._read_worktree_file_str("file.txt"))
+
+    def test_restore_staged_new_file_removes_from_index(self):
+        """Tests bit restore --staged on a new file removes it from the index."""
+        self._write_file("new.txt", "content")
+        self.repo.add(["new.txt"])
+        
+        # Unstage a file that doesn't exist in HEAD
+        self.repo.restore(["new.txt"], staged=True)
+        
+        index_entries = self.repo.index.load_as_dict()
+        self.assertNotIn("new.txt", index_entries)
+        # File should still exist in worktree
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "new.txt")))
+
+    def test_restore_multiple_files(self):
+        """Tests restoring multiple files at once."""
+        self._write_file("a.txt", "base a")
+        self._write_file("b.txt", "base b")
+        self.repo.add_all()
+        
+        self._write_file("a.txt", "dirty a")
+        self._write_file("b.txt", "dirty b")
+        
+        self.repo.restore(["a.txt", "b.txt"], staged=False)
+        
+        self.assertEqual("base a", self._read_worktree_file_str("a.txt"))
+        self.assertEqual("base b", self._read_worktree_file_str("b.txt"))
 
 if __name__ == '__main__':
     unittest.main()

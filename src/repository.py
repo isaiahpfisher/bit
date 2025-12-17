@@ -277,6 +277,29 @@ class Repository:
         for path in current_files:
             if path not in target_entries:
                 self.worktree.remove_file(path)
+      
+    def restore(self, targets, staged=False):
+        if staged:
+            head_hash = Ref.from_symbol(self, "HEAD").read_hash()
+            head_entries = Tree.get_entries_from_commit(self.db, head_hash)
+            index_entries = self.index.load_as_dict()
+            for target in targets:
+                original = head_entries.get(target)
+                if original:    
+                    index_entries[target] = original
+                else:
+                    del index_entries[target]
+            
+            self.index.write(index_entries)
+            
+        else:
+            target_entries = self.index.load_as_dict()
+            for target in targets:
+                original = target_entries.get(target)
+                if not original:
+                    raise FileNotFoundError(f"Could not find file '{target}'")
+                self.worktree.write_file(target, self.db.read(original))
+        
         
     # ----- UTILS -----
     def current_branch(self):

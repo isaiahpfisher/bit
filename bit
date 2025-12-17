@@ -13,6 +13,7 @@ from commands.checkout import CheckoutCommand
 from commands.diff import DiffCommand
 from commands.merge import MergeCommand
 from commands.reset import ResetCommand
+from commands.restore import RestoreCommand
 
 class CLI:
     def __init__(self):
@@ -29,6 +30,7 @@ class CLI:
             'diff': DiffCommand,
             'merge': MergeCommand,
             'reset': ResetCommand,
+            'restore': RestoreCommand,
         }
 
     def run(self):
