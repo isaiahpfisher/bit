@@ -240,7 +240,43 @@ class Repository:
         merge_engine = Merge(self, head_ref, other_ref)
         
         return merge_engine.attempt()
+    
+    def reset(self, target, mode="--mixed"):
+        """
+        Resets the current branch head to a specific commit.
+        --soft: only moves the branch pointer.
+        --mixed: moves pointer and updates index.
+        --hard: moves pointer, updates index, and updates worktree.
+        """
+        try:
+            target_hash = Ref.from_branch(self, target).read_hash()
+        except FileNotFoundError:
+            target_hash = target # assune hash if no branch found
+
+        if not target_hash:
+            raise Exception(f"Could not resolve target '{target}'")
+
+        head_ref = Ref.from_symbol(self, "HEAD")
+        head_ref.update(target_hash)
+
+        if mode == "--soft":
+            return
+
+        target_entries = Tree.get_entries_from_commit(self.db, target_hash)
+        self.index.write(target_entries)
+
+        if mode == "--mixed":
+            return
+
+        current_files = self.worktree.list_files()
         
+        for path, hash_val in target_entries.items():
+            content = self.db.read(hash_val)
+            self.worktree.write_file(path, content)
+        
+        for path in current_files:
+            if path not in target_entries:
+                self.worktree.remove_file(path)
         
     # ----- UTILS -----
     def current_branch(self):

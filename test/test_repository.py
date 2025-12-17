@@ -488,6 +488,94 @@ class TestRepository(unittest.TestCase):
         self.assertIn("SIDE 5\n", final_content)
         self.assertIn("MASTER 10\n", final_content)
         self.assertIn("Line 3\n", final_content) # Unchanged line
+        
+    def test_reset_soft(self):
+        self._write_file("file.txt", "v1")
+        self.repo.add_all()
+        commit1_hash = self.repo.commit("v1")
+        
+        self._write_file("file.txt", "v2")
+        self.repo.add_all()
+        commit2_hash = self.repo.commit("v2")
+        
+        self.repo.reset(commit1_hash, mode="--soft")
+        
+        self.assertEqual(commit1_hash, self._get_branch_hash("master"))
+        
+        index_entries = self.repo.index.load_as_dict()
+        hash_v2 = self.repo.db.store(b"v2")
+        self.assertEqual(hash_v2, index_entries["file.txt"])
+        
+        self.assertEqual("v2", self._read_worktree_file_str("file.txt"))
+
+    def test_reset_mixed(self):
+        self._write_file("file.txt", "v1")
+        self.repo.add_all()
+        commit1_hash = self.repo.commit("v1")
+        
+        self._write_file("file.txt", "v2")
+        self.repo.add_all()
+        commit2_hash = self.repo.commit("v2")
+        
+        self.repo.reset(commit1_hash, mode="--mixed")
+        
+        self.assertEqual(commit1_hash, self._get_branch_hash("master"))
+        
+        index_entries = self.repo.index.load_as_dict()
+        hash_v1 = self.repo.db.store(b"v1")
+        self.assertEqual(hash_v1, index_entries["file.txt"])
+        
+        self.assertEqual("v2", self._read_worktree_file_str("file.txt"))
+
+    def test_reset_hard(self):
+        self._write_file("file.txt", "v1")
+        self.repo.add_all()
+        commit1_hash = self.repo.commit("v1")
+        
+        self._write_file("file.txt", "v2")
+        self.repo.add_all()
+        commit2_hash = self.repo.commit("v2")
+        
+        self.repo.reset(commit1_hash, mode="--hard")
+        
+        self.assertEqual(commit1_hash, self._get_branch_hash("master"))
+        
+        index_entries = self.repo.index.load_as_dict()
+        hash_v1 = self.repo.db.store(b"v1")
+        self.assertEqual(hash_v1, index_entries["file.txt"])
+        
+        self.assertEqual("v1", self._read_worktree_file_str("file.txt"))
+
+    def test_reset_to_branch_name(self):
+        self._write_file("file.txt", "base")
+        self.repo.add_all()
+        self.repo.commit("base")
+        self.repo.branch("other")
+        
+        self._write_file("file.txt", "master_change")
+        self.repo.add_all()
+        self.repo.commit("master_change")
+        
+        self.repo.reset("other", mode="--hard")
+        
+        other_hash = self._get_branch_hash("other")
+        self.assertEqual(other_hash, self._get_branch_hash("master"))
+        self.assertEqual("base", self._read_worktree_file_str("file.txt"))
+
+    def test_reset_hard_removes_new_files(self):
+        self._write_file("file1.txt", "v1")
+        self.repo.add_all()
+        commit1_hash = self.repo.commit("v1")
+        
+        self._write_file("file2.txt", "v2")
+        self.repo.add_all()
+        self.repo.commit("v2")
+        
+        self.repo.reset(commit1_hash, mode="--hard")
+        
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "file2.txt")))
+        index_entries = self.repo.index.load_as_dict()
+        self.assertNotIn("file2.txt", index_entries)
 
 if __name__ == '__main__':
     unittest.main()
