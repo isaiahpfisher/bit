@@ -1,5 +1,7 @@
 import sys
+import os
 from .base import BaseCommand
+from exceptions.merge_conflict import MergeConflict
 
 class MergeCommand(BaseCommand):
     def run(self):     
@@ -12,4 +14,7 @@ class MergeCommand(BaseCommand):
         
         branch_name = self.args[0]
 
-        self.repo.merge(branch_name)
+        try:
+            self.repo.merge(branch_name)
+        except MergeConflict as e:
+            print(e.format_output())

@@ -98,8 +98,9 @@ class Repository:
         
         head_ref = Ref.from_symbol(self, 'HEAD')
         parent_hash = head_ref.read_hash()
+        parent_hashes = [parent_hash] if parent_hash else []
         
-        commit = Commit(root_tree.hash, [parent_hash], message)
+        commit = Commit(root_tree.hash, parent_hashes, message)
         commit_content = commit.serialize()
         commit_hash = self.db.store(commit_content)
         
@@ -182,16 +183,16 @@ class Repository:
     def list_branches(self):
         return Ref.list_all(self)
     
-    def checkout(self, branch):
+    def checkout(self, branch, force=False):
         current_head = Ref.from_symbol(self, "HEAD")
         target_head = Ref.from_branch(self, branch)
         
-        if current_head.name == target_head.name:
+        if not force and current_head.name == target_head.name:
             raise Exception(f"Already on branch '{branch}'")
         
         status = self.status()
         
-        if not status.is_clean():
+        if not force and not status.is_clean():
             raise Exception(f"Please stash or commit your changes before switching branches.")
         
         with open(os.path.join(self.bit_dir, "HEAD"), "w") as f:
@@ -221,15 +222,14 @@ class Repository:
         status = self.status()
         
         if not status.is_clean():
-            # raise Exception(f"Please stash or commit your changes before switching branches.")
-            pass
+            raise Exception(f"Please stash or commit your changes before switching branches.")
         
         other_ref = Ref.from_branch(self, branch_to_merge)
         head_ref = Ref.from_symbol(self, "HEAD")
         
         merge = Merge(self, head_ref, other_ref)
         
-        merge.attempt() 
+        merge.attempt()
         
         
     # ----- UTILS -----

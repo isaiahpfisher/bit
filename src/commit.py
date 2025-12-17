@@ -58,7 +58,7 @@ class Commit:
 
         return cls(
             tree_hash=tree_hash,
-            parent_hashes=parent_hashes,   # ✅ Correct list argument
+            parent_hashes=parent_hashes,
             message=message,
             author=author,
             email=email,
