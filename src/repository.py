@@ -89,24 +89,34 @@ class Repository:
         return self.add(all_paths_to_check)
 
     def commit(self, message):
-        """Create a new commit. Returns the commit hash or None."""
-        status = self.status()
-        if self.index.is_empty() and not status.staged:
-            return None
-        
-        root_tree = Tree.build_from_index(self.index, self.db)
-        
-        head_ref = Ref.from_symbol(self, 'HEAD')
-        parent_hash = head_ref.read_hash()
-        parent_hashes = [parent_hash] if parent_hash else []
-        
-        commit = Commit(root_tree.hash, parent_hashes, message)
-        commit_content = commit.serialize()
-        commit_hash = self.db.store(commit_content)
-        
-        head_ref.update(commit_hash)
-            
-        return commit_hash
+      status = self.status()
+      merge_head_path = os.path.join(self.bit_dir, 'MERGE_HEAD')
+      is_merging = os.path.exists(merge_head_path)
+
+      # Allow commit if there is a staged change OR if we are currently merging
+      if self.index.is_empty() and not status.staged and not is_merging:
+          return None
+      
+      root_tree = Tree.build_from_index(self.index, self.db)
+      head_ref = Ref.from_symbol(self, 'HEAD')
+      
+      parent_hashes = []
+      current_head = head_ref.read_hash()
+      if current_head:
+          parent_hashes.append(current_head)
+      
+      if is_merging:
+          with open(merge_head_path, 'r') as f:
+              parent_hashes.append(f.read().strip())
+      
+      commit = Commit(root_tree.hash, parent_hashes, message)
+      commit_hash = self.db.store(commit.serialize())
+      head_ref.update(commit_hash)
+      
+      if is_merging:
+          os.remove(merge_head_path)
+              
+      return commit_hash
     
     def status(self):
         """Compares HEAD, index, and worktree. Returns a Status object."""
@@ -227,9 +237,9 @@ class Repository:
         other_ref = Ref.from_branch(self, branch_to_merge)
         head_ref = Ref.from_symbol(self, "HEAD")
         
-        merge = Merge(self, head_ref, other_ref)
+        merge_engine = Merge(self, head_ref, other_ref)
         
-        merge.attempt()
+        return merge_engine.attempt()
         
         
     # ----- UTILS -----

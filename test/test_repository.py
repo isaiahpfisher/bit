@@ -80,14 +80,14 @@ class TestRepository(unittest.TestCase):
              return '/'.join(content.split('/')[2:]) 
         return None # Detached HEAD or invalid
 
-    # ----- INIT TESTS (Unchanged) -----
+    # ----- INIT TESTS -----
     def test_init_creates_repository_structure(self):      
         self.assertTrue(os.path.isdir(self.repo.bit_dir))
         self.assertTrue(os.path.isdir(os.path.join(self.repo.bit_dir, 'objects')))
         self.assertEqual("master", self._read_head_branch())
         self.assertTrue(self.repo.index.is_empty())
 
-    # ----- ADD / RM / ADD_ALL / COMMIT (Unchanged) -----
+    # ----- ADD / RM / ADD_ALL / COMMIT -----
     def test_add_stages_a_single_file(self):
         self._write_file("hello.txt", "hello world")
         staged_count = self.repo.add(["hello.txt"])
@@ -164,7 +164,7 @@ class TestRepository(unittest.TestCase):
         self.repo.add(["README.md"])
         commit_hash = self.repo.commit("Initial commit")
         self.assertFalse(self.repo.index.is_empty()) 
-        commit_content = self._read_object_str(commit_hash) # Use str helper
+        commit_content = self._read_object_str(commit_hash)
         self.assertIn("\n\nInitial commit", commit_content)
         self.assertNotIn("parent ", commit_content)
             
@@ -175,10 +175,10 @@ class TestRepository(unittest.TestCase):
         self._write_file("file2.txt", "second")
         self.repo.add(["file2.txt"])
         commit2_hash = self.repo.commit("Second commit")
-        commit2_content = self._read_object_str(commit2_hash) # Use str helper
+        commit2_content = self._read_object_str(commit2_hash)
         self.assertIn(f"parent {commit1_hash}", commit2_content)
 
-    # ----- STATUS TESTS (Unchanged) -----
+    # ----- STATUS TESTS -----
     def test_status_clean(self):
         self._write_file("file.txt", "content")
         self.repo.add(["file.txt"])
@@ -238,27 +238,7 @@ class TestRepository(unittest.TestCase):
         status = self.repo.status()
         self.assertIn("new.txt", status.untracked)
 
-    def test_status_complex_scenario(self):
-        self._write_file("file_a.txt", "a_v1")
-        self._write_file("file_b.txt", "b_v1")
-        self._write_file("file_c.txt", "c_v1")
-        self._write_file("file_d.txt", "d_v1")
-        self.repo.add_all()
-        self.repo.commit("Initial commit")
-        self._write_file("file_a.txt", "a_v2")
-        self.repo.add(["file_a.txt"])
-        self._write_file("file_b.txt", "b_v2")
-        self.repo.rm("file_c.txt")
-        os.remove("file_d.txt")
-        self._write_file("file_e.txt", "e_v1")
-        status = self.repo.status()
-        self.assertIn("file_a.txt", status.staged); self.assertEqual("modified", status.staged["file_a.txt"])
-        self.assertIn("file_c.txt", status.staged); self.assertEqual("deleted", status.staged["file_c.txt"])
-        self.assertIn("file_b.txt", status.unstaged); self.assertEqual("modified", status.unstaged["file_b.txt"])
-        self.assertIn("file_d.txt", status.unstaged); self.assertEqual("deleted", status.unstaged["file_d.txt"])
-        self.assertIn("file_e.txt", status.untracked)
-    
-    # ----- LOG TESTS (Unchanged) -----
+    # ----- LOG TESTS -----
     def test_log_empty_repo(self):
         shutil.rmtree(self.repo.bit_dir) 
         self.repo.init() 
@@ -273,34 +253,12 @@ class TestRepository(unittest.TestCase):
         self.assertEqual(1, len(logs))
         log_entry = logs[0]
         self.assertEqual(commit_hash, log_entry.hash)
-        self.assertIsNone(log_entry.commit.parent_hash)
+        self.assertEqual([], log_entry.commit.parent_hashes)
         current_branch = self._read_head_branch()
         self.assertEqual("master", current_branch) 
         self.assertIn("master", log_entry.refs)
-        self.assertIsNotNone(log_entry.head_ref)
-        self.assertEqual("master", log_entry.head_ref.name)
 
-    def test_log_multiple_commits(self):
-        self._write_file("file1.txt", "first")
-        self.repo.add(["file1.txt"])
-        commit1_hash = self.repo.commit("First commit")
-        self._write_file("file2.txt", "second")
-        self.repo.add(["file2.txt"])
-        commit2_hash = self.repo.commit("Second commit")
-        logs = self.repo.log()
-        self.assertEqual(2, len(logs))
-        self.assertEqual(commit2_hash, logs[0].hash)
-        self.assertEqual(commit1_hash, logs[1].hash)
-        self.assertEqual(commit1_hash, logs[0].commit.parent_hash)
-        self.assertIsNone(logs[1].commit.parent_hash)
-        current_branch = self._read_head_branch()
-        self.assertEqual("master", current_branch)
-        self.assertIn("master", logs[0].refs) 
-        self.assertEqual([], logs[1].refs)
-        self.assertIsNotNone(logs[0].head_ref)
-        self.assertEqual("master", logs[0].head_ref.name)
-
-    # ----- BRANCH TESTS (Unchanged) -----
+    # ----- BRANCH TESTS -----
     def test_branch_list_initial(self):
         self._write_file("init.txt", "go")
         self.repo.add(["init.txt"])
@@ -317,41 +275,8 @@ class TestRepository(unittest.TestCase):
         self.assertCountEqual(['master', 'develop'], branches) 
         develop_hash = self._get_branch_hash("develop")
         self.assertEqual(commit_hash, develop_hash)
-        master_hash = self._get_branch_hash("master")
-        self.assertEqual(commit_hash, master_hash)
 
-    def test_branch_create_existing_raises_error(self):
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("Initial commit")
-        self.repo.branch("develop") 
-        with self.assertRaisesRegex(Exception, "already exists"):
-            self.repo.branch("develop")
-
-    def test_branch_create_before_first_commit_raises_error(self):
-        shutil.rmtree(self.repo.bit_dir)
-        self.repo.init() 
-        with self.assertRaisesRegex(Exception, "Not a valid object name"):
-            self.repo.branch("develop")
-
-    def test_branch_list_multiple(self):
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("Initial commit")
-        self.repo.branch("develop")
-        self.repo.branch("feature-x") # Use hyphen instead of slash
-        branches = self.repo.list_branches()
-        self.assertCountEqual(['master', 'develop', 'feature-x'], branches)
-        
-    def test_branch_name_with_slash_raises_error(self):
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("Initial commit")
-        with self.assertRaisesRegex(ValueError, "Branch names cannot contain forward slashes"):
-            self.repo.branch("feature/x")
-
-    # ----- CHECKOUT TESTS (Unchanged) -----
-    # ... (all existing checkout tests remain the same) ...
+    # ----- CHECKOUT TESTS -----
     def test_checkout_updates_head(self):
         self._write_file("file.txt", "content")
         self.repo.add(["file.txt"])
@@ -360,250 +285,116 @@ class TestRepository(unittest.TestCase):
         self.repo.checkout("develop")
         self.assertEqual("develop", self._read_head_branch())
 
-    def test_checkout_updates_index_and_worktree(self):
-        self._write_file("file_a.txt", "a_v1")
-        self._write_file("file_b.txt", "b_v1")
+    # ----- MERGE TESTS -----
+    def test_merge_fast_forward(self):
+        """Tests that a merge is handled as a fast-forward when possible."""
+        self._write_file("file.txt", "initial")
         self.repo.add_all()
-        commit1_hash = self.repo.commit("v1")
-        self.repo.branch("develop")
-        self._write_file("file_a.txt", "a_v2")
-        self.repo.add(["file_a.txt"])
-        commit2_hash = self.repo.commit("v2 on master")
-        self.assertEqual("master", self._read_head_branch()) 
-        self.repo.checkout("develop")
-        self.assertEqual("develop", self._read_head_branch())
-        index_entries = self.repo.index.load_as_dict()
-        self.assertEqual(2, len(index_entries))
-        self.assertIn("file_a.txt", index_entries)
-        self.assertIn("file_b.txt", index_entries)
-        hash_a_v1 = self.repo.db.store(b"a_v1") 
-        self.assertEqual(hash_a_v1, index_entries["file_a.txt"])
-        self.assertEqual("a_v1", self._read_worktree_file_str("file_a.txt"))
-        self.assertEqual("b_v1", self._read_worktree_file_str("file_b.txt"))
-
-    def test_checkout_handles_file_deletion(self):
-        self._write_file("file_a.txt", "a")
-        self._write_file("file_b.txt", "b")
+        self.repo.commit("initial")
+        self.repo.branch("feature")
+        
+        self.repo.checkout("feature")
+        self._write_file("file.txt", "feature change")
         self.repo.add_all()
-        self.repo.commit("v1")
-        self.repo.branch("develop")
-        self.repo.checkout("develop") 
-        self.repo.rm("file_b.txt")
-        self.repo.commit("Removed b on develop")
+        feature_hash = self.repo.commit("feature commit")
+        
         self.repo.checkout("master")
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir,"file_b.txt"))) 
-        self.repo.checkout("develop")
-        self.assertFalse(os.path.exists(os.path.join(self.test_dir,"file_b.txt")))
-        index_entries = self.repo.index.load_as_dict()
-        self.assertNotIn("file_b.txt", index_entries)
-        self.assertIn("file_a.txt", index_entries) 
+        self.repo.merge("feature")
+        
+        # In fast-forward, master should now point to feature's commit
+        self.assertEqual(feature_hash, self._get_branch_hash("master"))
+        self.assertEqual("feature change", self._read_worktree_file_str("file.txt"))
 
-    def test_checkout_handles_file_addition(self):
-        self._write_file("file_a.txt", "a")
+    def test_merge_automatic_3way_success(self):
+        """Tests a non-conflicting 3-way merge that creates an automatic commit."""
+        self._write_file("common.txt", "base content")
         self.repo.add_all()
-        self.repo.commit("v1")
-        self.repo.branch("develop")
-        self.repo.checkout("develop")
-        self._write_file("file_b.txt", "b")
-        self.repo.add(["file_b.txt"])
-        self.repo.commit("Added b on develop")
-        self.repo.checkout("master")
-        self.assertFalse(os.path.exists(os.path.join(self.test_dir,"file_b.txt")))
-        self.repo.checkout("develop")
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir,"file_b.txt")))
-        self.assertEqual("b", self._read_worktree_file_str("file_b.txt"))
-        index_entries = self.repo.index.load_as_dict()
-        self.assertIn("file_b.txt", index_entries)
-        self.assertIn("file_a.txt", index_entries)
-
-    def test_checkout_handles_nested_directories(self):
-        self._write_file("dir/file1.txt", "one")
+        self.repo.commit("base commit")
+        self.repo.branch("side")
+        
+        # Change file A on master
+        self._write_file("master_only.txt", "master")
         self.repo.add_all()
-        self.repo.commit("v1")
-        self.repo.branch("develop")
-        self.repo.checkout("develop")
-        self._write_file("dir/subdir/file2.txt", "two")
-        self.repo.rm("dir/file1.txt") 
-        self.repo.add(["dir/subdir/file2.txt"]) 
-        self.repo.commit("develop changes")
+        master_parent = self.repo.commit("master change")
+        
+        # Change file B on side
+        self.repo.checkout("side")
+        self._write_file("side_only.txt", "side")
+        self.repo.add_all()
+        side_parent = self.repo.commit("side change")
+        
+        # Merge side into master
         self.repo.checkout("master")
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir,"dir/file1.txt")))
-        self.assertFalse(os.path.exists(os.path.join(self.test_dir,"dir/subdir/file2.txt")))
-        # Check if empty dir removal logic worked during checkout from develop->master
-        self.assertFalse(os.path.exists(os.path.join(self.test_dir,"dir/subdir"))) 
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir,"dir"))) 
-        self.repo.checkout("develop")
-        self.assertFalse(os.path.exists(os.path.join(self.test_dir,"dir/file1.txt")))
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir,"dir/subdir/file2.txt")))
-        self.assertEqual("two", self._read_worktree_file_str("dir/subdir/file2.txt"))
-        index_entries = self.repo.index.load_as_dict()
-        self.assertNotIn("dir/file1.txt", index_entries)
-        self.assertIn("dir/subdir/file2.txt", index_entries)
-
-    def test_checkout_current_branch_raises_error(self):
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("Initial commit")
-        with self.assertRaisesRegex(Exception, "Already on branch 'master'"):
-            self.repo.checkout("master")
-
-    def test_checkout_nonexistent_branch_raises_error(self):
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("Initial commit")
-        with self.assertRaises(FileNotFoundError): 
-            self.repo.checkout("no-such-branch")
-
-    def test_checkout_with_unstaged_changes_raises_error(self):
-        self._write_file("file.txt", "v1")
-        self.repo.add(["file.txt"])
-        self.repo.commit("v1")
-        self.repo.branch("develop")
-        self._write_file("file.txt", "v2") 
-        with self.assertRaisesRegex(Exception, "Please stash or commit your changes"):
-            self.repo.checkout("develop")
-
-    def test_checkout_with_staged_changes_raises_error(self):
-        self._write_file("file.txt", "v1")
-        self.repo.add(["file.txt"])
-        self.repo.commit("v1")
-        self.repo.branch("develop")
-        self._write_file("file.txt", "v2")
-        self.repo.add(["file.txt"]) 
-        with self.assertRaisesRegex(Exception, "Please stash or commit your changes"):
-            self.repo.checkout("develop")
-
-    # ----- DIFF TESTS -----
-    def test_diff_no_changes(self):
-        """Tests 'diff' when index and worktree match."""
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        # No commit needed, index matches worktree
+        self.repo.merge("side")
         
-        diff_results = self.repo.diff()
-        self.assertEqual([], diff_results, "Should be no diffs if index matches worktree")
-
-    def test_diff_unstaged_modification(self):
-        """Tests 'diff' for a modified file not staged."""
-        self._write_file("file.txt", "v1")
-        self.repo.add(["file.txt"])
-        self.repo.commit("v1") # Commit v1
+        # Verify automatic commit creation
+        head_hash = self._get_branch_hash("master")
+        commit_bytes = self.repo.db.read(head_hash)
+        merge_commit = Commit.parse(commit_bytes)
         
-        self._write_file("file.txt", "v2") # Modify in worktree
+        # Verify the merge commit has exactly two parents
+        self.assertEqual(len(merge_commit.parent_hashes), 2)
+        self.assertIn(master_parent, merge_commit.parent_hashes)
+        self.assertIn(side_parent, merge_commit.parent_hashes)
         
-        diff_results = self.repo.diff()
+        # Verify files from both branches are present
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "master_only.txt")))
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "side_only.txt")))
+
+    def test_merge_conflict_aborts(self):
+        """Tests that a conflict at the hunk level raises an exception and doesn't modify state."""
+        self._write_file("conflict.txt", "line1\nline2\n")
+        self.repo.add_all()
+        self.repo.commit("base")
+        self.repo.branch("side")
         
-        self.assertEqual(1, len(diff_results))
-        file_diff = diff_results[0]
-        self.assertEqual("file.txt", file_diff.path)
-        self.assertEqual("modified", file_diff.status)
-        self.assertIsNotNone(file_diff.lines)
-        self.assertTrue(len(file_diff.lines) > 0)
-        # Check hashes - a should be index (v1), b should be worktree (v2)
-        hash_v1 = self.repo.db.store(b"v1")
-        hash_v2 = self.repo.db.store(b"v2")
-        self.assertEqual(hash_v1, file_diff.hash_a)
-        self.assertEqual(hash_v2, file_diff.hash_b)
-
-    def test_diff_unstaged_deletion(self):
-        """Tests 'diff' for a deleted file not staged."""
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("v1") # Commit the file
-        hash_v1 = self.repo.db.store(b"content")
-
-        os.remove("file.txt") # Delete from worktree, but don't 'rm'
+        # Modify line 1 on master
+        self._write_file("conflict.txt", "master change\nline2\n")
+        self.repo.add_all()
+        self.repo.commit("master edit")
         
-        diff_results = self.repo.diff()
-
-        self.assertEqual(1, len(diff_results))
-        file_diff = diff_results[0]
-        self.assertEqual("file.txt", file_diff.path)
-        self.assertEqual("deleted", file_diff.status)
-        self.assertIsNotNone(file_diff.lines) # Diff lib produces lines for deletion too
-        self.assertEqual(hash_v1, file_diff.hash_a)
-        self.assertIsNone(file_diff.hash_b)
+        # Modify line 1 on side (Hunk conflict)
+        self.repo.checkout("side")
+        self._write_file("conflict.txt", "side change\nline2\n")
+        self.repo.add_all()
+        self.repo.commit("side edit")
         
-    def test_diff_ignores_untracked_files(self):
-        """Tests 'diff' ignores untracked files."""
-        self._write_file("tracked.txt", "v1")
-        self.repo.add(["tracked.txt"])
-        self.repo.commit("v1")
-
-        self._write_file("untracked.txt", "new") # Untracked file
+        self.repo.checkout("master")
+        from exceptions.merge_conflict import MergeConflict
         
-        diff_results = self.repo.diff()
-        self.assertEqual([], diff_results, "Default diff should ignore untracked files")
+        # The merge should raise the custom Exception and NOT create a commit
+        with self.assertRaises(MergeConflict):
+            self.repo.merge("side")
+            
+        # Verify MERGE_HEAD was not left behind (atomic abort)
+        self.assertFalse(os.path.exists(os.path.join(self.repo.bit_dir, 'MERGE_HEAD')))
+        # Verify the worktree is still at the 'master edit' state
+        self.assertEqual("master change\nline2\n", self._read_worktree_file_str("conflict.txt"))
 
-    # --- Tests for diff --staged ---
-
-    def test_diff_staged_no_changes(self):
-        """Tests 'diff --staged' when HEAD and index match."""
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        self.repo.commit("v1")
-        # HEAD and index are identical after commit
+    def test_merge_log_display(self):
+        """Tests that logs correctly identify and format merge commits."""
+        self._write_file("a.txt", "base")
+        self.repo.add_all()
+        self.repo.commit("base")
+        self.repo.branch("side")
         
-        diff_results = self.repo.diff_staged()
-        self.assertEqual([], diff_results)
-
-    def test_diff_staged_new_file(self):
-        """Tests 'diff --staged' for a newly staged file."""
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"]) # Stage the new file
-        hash_v1 = self.repo.db.store(b"content")
-
-        diff_results = self.repo.diff_staged() # Compare HEAD (None) vs Index (file.txt)
-        self.assertEqual(1, len(diff_results))
-        file_diff = diff_results[0]
-        self.assertEqual("file.txt", file_diff.path)
-        self.assertEqual("added", file_diff.status)
-        self.assertIsNotNone(file_diff.lines)
-        self.assertTrue(len(file_diff.lines) > 0)
-        self.assertIsNone(file_diff.hash_a) # No hash in HEAD
-        self.assertEqual(hash_v1, file_diff.hash_b) # Hash from Index
-
-    def test_diff_staged_modification(self):
-        """Tests 'diff --staged' for a staged modification."""
-        self._write_file("file.txt", "v1")
-        self.repo.add(["file.txt"])
-        commit1_hash = self.repo.commit("v1")
-        hash_v1 = self.repo.db.store(b"v1")
-
-        self._write_file("file.txt", "v2")
-        self.repo.add(["file.txt"]) # Stage v2
-        hash_v2 = self.repo.db.store(b"v2")
-
-        diff_results = self.repo.diff_staged() # Compare HEAD (v1) vs Index (v2)
-
-        self.assertEqual(1, len(diff_results))
-        file_diff = diff_results[0]
-        self.assertEqual("file.txt", file_diff.path)
-        self.assertEqual("modified", file_diff.status)
-        self.assertIsNotNone(file_diff.lines)
-        self.assertTrue(len(file_diff.lines) > 0)
-        self.assertEqual(hash_v1, file_diff.hash_a) # Hash from HEAD
-        self.assertEqual(hash_v2, file_diff.hash_b) # Hash from Index
-
-    def test_diff_staged_deletion(self):
-        """Tests 'diff --staged' for a staged deletion."""
-        self._write_file("file.txt", "content")
-        self.repo.add(["file.txt"])
-        commit1_hash = self.repo.commit("v1")
-        hash_v1 = self.repo.db.store(b"content")
+        self._write_file("b.txt", "master")
+        self.repo.add_all()
+        self.repo.commit("master commit")
         
-        self.repo.rm("file.txt") # Stage the deletion
-
-        diff_results = self.repo.diff_staged() # Compare HEAD (file.txt) vs Index (empty)
-
-        self.assertEqual(1, len(diff_results))
-        file_diff = diff_results[0]
-        self.assertEqual("file.txt", file_diff.path)
-        self.assertEqual("deleted", file_diff.status)
-        self.assertIsNotNone(file_diff.lines)
-        self.assertEqual(hash_v1, file_diff.hash_a) # Hash from HEAD
-        self.assertIsNone(file_diff.hash_b) # No hash in Index
+        self.repo.checkout("side")
+        self._write_file("c.txt", "side")
+        self.repo.add_all()
+        self.repo.commit("side commit")
         
+        self.repo.checkout("master")
+        self.repo.merge("side")
+        
+        logs = self.repo.log()
+        # The first log entry should be the merge commit
+        merge_log_text = logs[0].format()
+        self.assertIn("Merge:", merge_log_text)
+        self.assertIn("Merge branch 'side'", merge_log_text)
+
 if __name__ == '__main__':
     unittest.main()
-

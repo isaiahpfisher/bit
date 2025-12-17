@@ -8,16 +8,19 @@ class Log:
         self.refs = refs
         
     def format(self):
-        lines = []
-        lines.append(f"{Formatter.YELLOW}commit {self.hash} {self._decorate()}{Formatter.RESET}")
-        if len(self.commit.parent_hashes) > 1:
-            print("Merge:", " ".join(self.commit.parent_hashes))
-        lines.append(f"Author: {self.commit.author}")
-        lines.append(f"Date: {Formatter.format_timestamp(self.commit.timestamp)}")
-        lines.append(f"\n    {self.commit.message}\n")
-        
-        return "\n".join(lines)
-    
+      lines = []
+      lines.append(f"{Formatter.YELLOW}commit {self.hash} {self._decorate()}{Formatter.RESET}")
+      
+      if len(self.commit.parent_hashes) > 1:
+          parent_line = " ".join(h[:7] for h in self.commit.parent_hashes)
+          lines.append(f"Merge: {parent_line}")
+          
+      lines.append(f"Author: {self.commit.author}")
+      lines.append(f"Date: {Formatter.format_timestamp(self.commit.timestamp)}")
+      lines.append(f"\n    {self.commit.message}\n")
+      
+      return "\n".join(lines)
+      
     
     # ----- UTILS -----
     def _decorate(self):

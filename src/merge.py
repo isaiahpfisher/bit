@@ -4,6 +4,7 @@ from .tree import Tree
 from .ref import Ref
 from .diff_calculator import DiffCalculator
 from exceptions.merge_conflict import MergeConflict
+import os
 
 class Merge:
     
@@ -14,16 +15,64 @@ class Merge:
         self.base_hash = self.find_common_ancestor()
         
     def attempt(self):
-        
-        if (self.base_hash == self.head_ref.read_hash()):
+        head_hash = self.head_ref.read_hash()
+        other_hash = self.other_ref.read_hash()
+
+        if self.base_hash == other_hash:
+            return "ALREADY_UP_TO_DATE"
+
+        if self.base_hash == head_hash:
             self.fast_forward()
-        else:
-            modify_conflicts, delete_conflicts = self.get_conflicts()
+            return "FAST_FORWARD"
+
+        modify_conflicts, delete_conflicts = self.get_conflicts()
+        
+        if modify_conflicts or delete_conflicts:
             raise MergeConflict(modify_conflicts, delete_conflicts)
+            
+        commit_hash = self.resolve_automatic_merge()
+        return f"MERGE_SUCCESS:{commit_hash}"
             
     def fast_forward(self):
         self.head_ref.update(self.other_ref.read_hash())
         self.repo.checkout(self.head_ref.name, force=True)
+        
+    def resolve_automatic_merge(self):
+      base_entries = Tree.get_entries_from_commit(self.repo.db, self.base_hash)
+      head_entries = Tree.get_entries_from_commit(self.repo.db, self.head_ref.read_hash())
+      other_entries = Tree.get_entries_from_commit(self.repo.db, self.other_ref.read_hash())
+      
+      all_paths = set(base_entries.keys()) | set(head_entries.keys()) | set(other_entries.keys())
+      merged_entries = {}
+
+      for path in all_paths:
+          base = base_entries.get(path)
+          head = head_entries.get(path)
+          other = other_entries.get(path)
+
+          if head == other:
+              if head: merged_entries[path] = head
+          elif base == head:
+              if other: merged_entries[path] = other
+          elif base == other:
+              if head: merged_entries[path] = head
+
+      self.repo.index.write(merged_entries)
+      for path, hash_val in merged_entries.items():
+          content = self.repo.db.read(hash_val)
+          self.repo.worktree.write_file(path, content)
+      
+      for path in head_entries:
+          if path not in merged_entries:
+              self.repo.worktree.remove_file(path)
+
+      # Record MERGE_HEAD so Repository.commit knows to add the second parent
+      merge_head_path = os.path.join(self.repo.bit_dir, 'MERGE_HEAD')
+      with open(merge_head_path, 'w') as f:
+          f.write(self.other_ref.read_hash())
+      
+      merge_msg = f"Merge branch '{self.other_ref.name}'"
+      return self.repo.commit(merge_msg)
         
     # ----- UTILS -----
     def find_common_ancestor(self):
