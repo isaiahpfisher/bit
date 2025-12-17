@@ -1,10 +1,12 @@
 import os
 import sys
 import hashlib
+import re
 
 class Worktree:
     def __init__(self, path):
         self.path = path
+        self.ignore_path = os.path.join(self.path, '.bitignore')
 
     def normalize_path(self, user_path):
         """
@@ -51,36 +53,95 @@ class Worktree:
         
     def list_files(self):
         """
-        Recursively lists all files in the worktree, ignoring the .bit directory.
-        Returns a list of normalized, relative paths.
+        Recursively lists all files in the worktree, respecting .bitignore.
         """
         files = []
+        ignore_patterns = self.get_ignore_patterns()
         for root, dirs, filenames in os.walk(self.path):
+            rel_root = self.normalize_path(root)
+            if rel_root == ".":
+                rel_root = ""
+            
             if '.bit' in dirs:
                 dirs.remove('.bit')
             if '.git' in dirs:
-                dirs.remove('.git') # TODO: .bitignore
+                dirs.remove('.git')
+
+            dirs[:] = [d for d in dirs if not self.is_ignored(os.path.join(rel_root, d), ignore_patterns)]
 
             for filename in filenames:
-                full_path = os.path.join(root, filename)
-                files.append(self.normalize_path(full_path))
+                rel_path = os.path.join(rel_root, filename)
+                
+                if not self.is_ignored(rel_path, ignore_patterns):
+                    files.append(rel_path)
         return files
     
     def list_and_hash_files(self):
-        """
-        Recursively lists all files in the worktree, ignoring the .bit directory.
-        Returns a dictionary of normalized, relative paths, along with their content hashes.
-        """
-        files = {}
-        for root, dirs, filenames in os.walk(self.path):
-            if '.bit' in dirs:
-                dirs.remove('.bit')
-            if '.git' in dirs:
-                dirs.remove('.git') # TODO: .bitignore
+      files = {}
+      ignore_patterns = self.get_ignore_patterns()
+      
+      for root, dirs, filenames in os.walk(self.path):
+          rel_root = self.normalize_path(root)
+          if rel_root == ".":
+              rel_root = ""
+          
+          if '.bit' in dirs:
+              dirs.remove('.bit')
 
-            for filename in filenames:
-                full_path = self.normalize_path(os.path.join(root, filename))
-                content = self.read_file(full_path)
-                hash = hashlib.sha1(content).hexdigest()
-                files[full_path] = hash
-        return files
+          dirs[:] = [d for d in dirs if not self.is_ignored(os.path.join(rel_root, d), ignore_patterns)]
+
+          for filename in filenames:
+              rel_path = os.path.join(rel_root, filename)
+              
+              if self.is_ignored(rel_path, ignore_patterns):
+                  continue
+                  
+              content = self.read_file(rel_path)
+              file_hash = hashlib.sha1(content).hexdigest()
+              files[rel_path] = file_hash
+              
+      return files
+
+    def get_ignore_patterns(self):
+        """Returns a list of ignore rules for the current worktree."""
+        regex_patterns = []
+        
+        if os.path.exists(self.ignore_path):
+            with open(self.ignore_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        regex_patterns.append(self.compile_pattern(line))
+        
+        return regex_patterns
+
+    def compile_pattern(self, pattern):
+        """Converts a single .bitignore pattern into a regex."""
+        is_dir_only = pattern.endswith('/')
+        if is_dir_only:
+            pattern = pattern[:-1]
+
+        if pattern.startswith('/'):
+            anchored = True
+            pattern = pattern[1:]
+        else:
+            anchored = False
+
+        regex = re.escape(pattern).replace(r'\*', '.*').replace(r'\?', '.')
+
+        if anchored:
+            regex = '^' + regex
+        else:
+            # Match start of path or after any directory separator
+            regex = '(^|.*/)' + regex
+
+        if is_dir_only:
+            regex += '(/.*)?$'
+        else:
+            regex += '$'
+
+        return re.compile(regex)
+
+    def is_ignored(self, path, compiled_patterns):
+        """Checks if a normalized path matches any of the compiled patterns."""
+        return any(p.match(path) for p in compiled_patterns)

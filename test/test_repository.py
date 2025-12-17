@@ -576,6 +576,81 @@ class TestRepository(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.test_dir, "file2.txt")))
         index_entries = self.repo.index.load_as_dict()
         self.assertNotIn("file2.txt", index_entries)
+        
+    # ----- IGNORE TESTS -----
+    def test_ignore_basic_filename(self):
+        """Tests that a specific filename in .bitignore is ignored."""
+        self._write_file(".bitignore", "ignored.txt")
+        self._write_file("ignored.txt", "should not see me")
+        self._write_file("tracked.txt", "see me")
+        
+        status = self.repo.status()
+        self.assertNotIn("ignored.txt", status.untracked)
+        self.assertIn("tracked.txt", status.untracked)
+
+    def test_ignore_wildcard_extension(self):
+        """Tests that wildcard patterns like *.log are ignored."""
+        self._write_file(".bitignore", "*.log")
+        self._write_file("error.log", "error data")
+        self._write_file("app.log", "app data")
+        self._write_file("README.md", "info")
+        
+        status = self.repo.status()
+        self.assertNotIn("error.log", status.untracked)
+        self.assertNotIn("app.log", status.untracked)
+        self.assertIn("README.md", status.untracked)
+
+    def test_ignore_directory(self):
+        """Tests that an entire directory and its contents are ignored."""
+        self._write_file(".bitignore", "temp/")
+        self._write_file("temp/file1.tmp", "temp")
+        self._write_file("temp/sub/file2.tmp", "temp")
+        self._write_file("keep.txt", "keep")
+        
+        # Verify list_files doesn't descend into temp/
+        files = self.repo.worktree.list_files()
+        self.assertIn("keep.txt", files)
+        self.assertNotIn("temp/file1.tmp", files)
+        self.assertNotIn("temp/sub/file2.tmp", files)
+        
+        status = self.repo.status()
+        self.assertNotIn("temp/file1.tmp", status.untracked)
+
+    def test_ignore_anchored_path(self):
+        """Tests that a leading slash anchors the pattern to the root."""
+        self._write_file(".bitignore", "/root_only.txt")
+        self._write_file("root_only.txt", "ignore me")
+        self._write_file("subdir/root_only.txt", "track me")
+        
+        status = self.repo.status()
+        self.assertNotIn("root_only.txt", status.untracked)
+        # Depending on your regex logic, this verifies the anchor works
+        self.assertIn("subdir/root_only.txt", status.untracked)
+
+    def test_ignore_comments_and_empty_lines(self):
+        """Tests that comments and whitespace in .bitignore are handled."""
+        content = (
+            "# This is a comment\n"
+            "\n"
+            "  \n"
+            "ignored.txt\n"
+        )
+        self._write_file(".bitignore", content)
+        self._write_file("ignored.txt", "ignore")
+        self._write_file("normal.txt", "track")
+        
+        status = self.repo.status()
+        self.assertNotIn("ignored.txt", status.untracked)
+        self.assertIn("normal.txt", status.untracked)
+
+    def test_internal_bit_dir_always_ignored(self):
+        """Ensures the .bit directory is never tracked even without a .bitignore."""
+        # Create a dummy file inside .bit (though Repository.init already creates files)
+        self._write_file(".bit/config", "some config")
+        
+        status = self.repo.status()
+        for path in status.untracked:
+            self.assertFalse(path.startswith(".bit"), f"Found internal file in status: {path}")
 
 if __name__ == '__main__':
     unittest.main()
