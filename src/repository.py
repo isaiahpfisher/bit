@@ -9,6 +9,7 @@ from .status import Status
 from .log import Log
 from .diff_calculator import DiffCalculator
 from .merge import Merge
+from .stash import Stash
 
 class Repository:
     """Represents a Bit repository."""
@@ -300,7 +301,15 @@ class Repository:
                     raise FileNotFoundError(f"Could not find file '{target}'")
                 self.worktree.write_file(target, self.db.read(original))
         
-        
+    def stash_push(self, message=None):
+        return Stash(self).push(message)
+
+    def stash_pop(self):
+        return Stash(self).pop()
+
+    def stash_list(self):
+        return Stash(self).list_all()
+    
     # ----- UTILS -----
     def current_branch(self):
         return Ref.from_symbol(self, "HEAD").name

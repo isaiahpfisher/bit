@@ -14,12 +14,15 @@ class FileDiff:
         
         for self_hunk in self.get_hunks():
             for other_hunk in other.get_hunks():
-                if self_hunk.conflits_with(other_hunk):
+                if self_hunk.conflicts_with(other_hunk):
                     return True
         
         return False
     
     def get_hunks(self) -> list[Hunk]:
+        if not self.lines:
+            return []
+        
         hunks = []
         hunk_lines = []
         

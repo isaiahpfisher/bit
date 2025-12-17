@@ -22,7 +22,7 @@ class Hunk:
         new_count = int(m.group(4)) if m.group(4) is not None else 1
         return cls(file_diff, lines, old_start, old_count, new_start, new_count)
         
-    def conflits_with(self, other: 'Hunk'):
+    def conflicts_with(self, other: 'Hunk'):
         if self.file_diff.path != other.file_diff.path:
             return False
         

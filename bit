@@ -14,6 +14,7 @@ from commands.diff import DiffCommand
 from commands.merge import MergeCommand
 from commands.reset import ResetCommand
 from commands.restore import RestoreCommand
+from commands.stash import StashCommand
 
 class CLI:
     def __init__(self):
@@ -31,6 +32,7 @@ class CLI:
             'merge': MergeCommand,
             'reset': ResetCommand,
             'restore': RestoreCommand,
+            'stash': StashCommand,
         }
 
     def run(self):

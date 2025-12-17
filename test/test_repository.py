@@ -715,6 +715,123 @@ class TestRepository(unittest.TestCase):
         
         self.assertEqual("base a", self._read_worktree_file_str("a.txt"))
         self.assertEqual("base b", self._read_worktree_file_str("b.txt"))
+        
+    # ----- STASH TESTS -----
+    def test_stash_push_cleans_worktree(self):
+        """Tests that stash push saves changes and resets the worktree."""
+        self._write_file("file.txt", "v1")
+        self.repo.add_all()
+        self.repo.commit("initial")
+        
+        # Modify file and add a new one
+        self._write_file("file.txt", "v2")
+        self._write_file("new.txt", "stashed")
+        
+        self.repo.stash_push("my changes")
+        
+        # Worktree should be back to v1 and new.txt should be gone
+        self.assertEqual("v1", self._read_worktree_file_str("file.txt"))
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "new.txt")))
+        
+        # Stash ref should exist
+        stash_ref_path = os.path.join(self.repo.bit_dir, 'refs', 'stash')
+        self.assertTrue(os.path.exists(stash_ref_path))
+
+    def test_stash_pop_restores_changes(self):
+        """Tests that stash pop re-applies the saved changes."""
+        self._write_file("file.txt", "v1")
+        self.repo.add_all()
+        self.repo.commit("initial")
+        
+        self._write_file("file.txt", "v2")
+        self.repo.stash_push()
+        
+        self.repo.stash_pop()
+        
+        self.assertEqual("v2", self._read_worktree_file_str("file.txt"))
+        # Stash ref should be removed if it was the last one
+        stash_ref_path = os.path.join(self.repo.bit_dir, 'refs', 'stash')
+        self.assertFalse(os.path.exists(stash_ref_path))
+
+    def test_stash_list_multiple_entries(self):
+        """Tests that multiple stashes form a stack."""
+        self._write_file("f.txt", "base")
+        self.repo.add_all()
+        self.repo.commit("base")
+        
+        # First stash
+        self._write_file("f.txt", "change 1")
+        self.repo.stash_push("first")
+        
+        # Second stash
+        self._write_file("f.txt", "change 2")
+        self.repo.stash_push("second")
+        
+        stashes = self.repo.stash_list()
+        self.assertEqual(len(stashes), 2)
+        # Most recent should be at index 0
+        self.assertEqual(stashes[0]['message'], "second")
+        self.assertEqual(stashes[1]['message'], "first")
+
+    def test_stash_pop_on_different_branch(self):
+        """Tests that a stash can be popped onto a different branch (3-way merge)."""
+        self._write_file("common.txt", "base")
+        self.repo.add_all()
+        self.repo.commit("base")
+        
+        self.repo.branch("other")
+        
+        # Change common.txt and stash it
+        self._write_file("common.txt", "stashed change")
+        self.repo.stash_push()
+        
+        # Switch to 'other' and make a different change
+        self.repo.checkout("other")
+        self._write_file("new_file.txt", "I am new")
+        self.repo.add_all()
+        self.repo.commit("other commit")
+        
+        # Pop the stash onto 'other'
+        self.repo.stash_pop()
+        
+        self.assertEqual("stashed change", self._read_worktree_file_str("common.txt"))
+        self.assertEqual("I am new", self._read_worktree_file_str("new_file.txt"))
+
+    def test_stash_pop_conflicts_raises_error(self):
+        """Tests that conflicting changes during pop raise MergeConflict."""
+        self._write_file("conflict.txt", "base")
+        self.repo.add_all()
+        self.repo.commit("base")
+        
+        # Stash a change to line 1
+        self._write_file("conflict.txt", "stash change")
+        self.repo.stash_push()
+        
+        # Commit a different change to line 1
+        self._write_file("conflict.txt", "manual change")
+        self.repo.add_all()
+        self.repo.commit("manual commit")
+        
+        from exceptions.merge_conflict import MergeConflict
+        with self.assertRaises(MergeConflict):
+            self.repo.stash_pop()
+
+    def test_stash_pop_fails_if_worktree_dirty(self):
+        """Tests that stash pop prevents overwriting uncommitted local changes."""
+        self._write_file("f.txt", "base")
+        self.repo.add_all()
+        self.repo.commit("base")
+        
+        self._write_file("f.txt", "stashed")
+        self.repo.stash_push()
+        
+        # Make worktree dirty
+        self._write_file("dirty.txt", "dirty")
+        
+        # Depending on your implementation, this should either fail or 
+        # the implementation should be updated to check status().is_clean()
+        with self.assertRaises(Exception):
+            self.repo.stash_pop()
 
 if __name__ == '__main__':
     unittest.main()
