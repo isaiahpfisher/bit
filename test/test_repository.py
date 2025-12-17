@@ -395,6 +395,99 @@ class TestRepository(unittest.TestCase):
         merge_log_text = logs[0].format()
         self.assertIn("Merge:", merge_log_text)
         self.assertIn("Merge branch 'side'", merge_log_text)
+        
+    def test_merge_content_no_conflict(self):
+        """Tests that two different changes to the same file are merged automatically."""
+        # 1. Setup a file with several lines
+        initial_content = "Line 1: Header\nLine 2: Middle\nLine 3: Footer\n"
+        self._write_file("file.txt", initial_content)
+        self.repo.add_all()
+        self.repo.commit("base")
+        self.repo.branch("side")
+        
+        # 2. Master branch modifies the Header (Line 1)
+        master_content = "Line 1: MASTER EDIT\nLine 2: Middle\nLine 3: Footer\n"
+        self._write_file("file.txt", master_content)
+        self.repo.add_all()
+        self.repo.commit("master edit")
+        
+        # 3. Side branch modifies the Footer (Line 3)
+        self.repo.checkout("side")
+        side_content = "Line 1: Header\nLine 2: Middle\nLine 3: SIDE EDIT\n"
+        self._write_file("file.txt", side_content)
+        self.repo.add_all()
+        self.repo.commit("side edit")
+        
+        # 4. Perform the merge on Master
+        self.repo.checkout("master")
+        result = self.repo.merge("side")
+        
+        # 5. Verify Success status and automatic commit
+        self.assertTrue(result.startswith("MERGE_SUCCESS:"))
+        
+        # 6. Check that the final file content has BOTH edits
+        # Note: Depending on your diff implementation, it might or might not have trailing newlines
+        expected_merged = "Line 1: MASTER EDIT\nLine 2: Middle\nLine 3: SIDE EDIT\n"
+        actual_content = self._read_worktree_file_str("file.txt")
+        self.assertEqual(actual_content, expected_merged)
+
+    def test_merge_identical_changes(self):
+        """Tests that if both branches make the EXACT same change, it merges cleanly."""
+        self._write_file("file.txt", "base content\n")
+        self.repo.add_all()
+        self.repo.commit("base")
+        self.repo.branch("side")
+        
+        # Master changes content
+        self._write_file("file.txt", "new content\n")
+        self.repo.add_all()
+        self.repo.commit("master change")
+        
+        # Side makes the exact same change
+        self.repo.checkout("side")
+        self._write_file("file.txt", "new content\n")
+        self.repo.add_all()
+        self.repo.commit("side change")
+        
+        self.repo.checkout("master")
+        result = self.repo.merge("side")
+        
+        self.assertTrue(result.startswith("MERGE_SUCCESS:"))
+        self.assertEqual("new content\n", self._read_worktree_file_str("file.txt"))
+
+    def test_merge_complex_content_stitching(self):
+        """Tests merging multiple non-overlapping hunks from both sides."""
+        base_lines = [f"Line {i}\n" for i in range(1, 11)] # 10 lines
+        self._write_file("big_file.txt", "".join(base_lines))
+        self.repo.add_all()
+        self.repo.commit("base")
+        self.repo.branch("side")
+        
+        # Master modifies lines 1 and 10
+        master_lines = base_lines[:]
+        master_lines[0] = "MASTER 1\n"
+        master_lines[9] = "MASTER 10\n"
+        self._write_file("big_file.txt", "".join(master_lines))
+        self.repo.add_all()
+        self.repo.commit("master")
+        
+        # Side modifies line 5
+        self.repo.checkout("side")
+        side_lines = base_lines[:]
+        side_lines[4] = "SIDE 5\n"
+        self._write_file("big_file.txt", "".join(side_lines))
+        self.repo.add_all()
+        self.repo.commit("side")
+        
+        self.repo.checkout("master")
+        self.repo.merge("side")
+        
+        # Result should have all three modifications
+        final_content = self._read_worktree_file_str("big_file.txt")
+        self.assertIn("MASTER 1\n", final_content)
+        self.assertIn("SIDE 5\n", final_content)
+        self.assertIn("MASTER 10\n", final_content)
+        self.assertIn("Line 3\n", final_content) # Unchanged line
 
 if __name__ == '__main__':
     unittest.main()

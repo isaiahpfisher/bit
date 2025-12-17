@@ -56,6 +56,13 @@ class Merge:
               if other: merged_entries[path] = other
           elif base == other:
               if head: merged_entries[path] = head
+          else:
+                head_diff = DiffCalculator.calculate_file_vs_file(self.repo, path, base, head, n=0)
+                other_diff = DiffCalculator.calculate_file_vs_file(self.repo, path, base, other, n=0)
+                
+                base_content = self.repo.db.read(base)
+                merged_content = self._merge_file_contents(base_content, head_diff, other_diff)
+                merged_entries[path] = self.repo.db.store(merged_content)
 
       self.repo.index.write(merged_entries)
       for path, hash_val in merged_entries.items():
@@ -73,6 +80,22 @@ class Merge:
       
       merge_msg = f"Merge branch '{self.other_ref.name}'"
       return self.repo.commit(merge_msg)
+  
+    def _merge_file_contents(self, base_content, head_diff, other_diff):
+      base_lines = base_content.decode('utf-8').splitlines(keepends=True)
+      
+      hunks = head_diff.get_hunks() + other_diff.get_hunks()
+      hunks.sort(key=lambda h: h.old_start, reverse=True)
+      
+      merged_lines = base_lines[:]
+      for hunk in hunks:
+          # Lines in hunk includes header, we only want the actual change lines
+          new_content = [l[1:] for l in hunk.lines[1:] if not l.startswith('-')]
+          start = hunk.old_start - 1
+          end = start + hunk.old_count
+          merged_lines[start:end] = new_content
+          
+      return "".join(merged_lines)
         
     # ----- UTILS -----
     def find_common_ancestor(self):
