@@ -1,4 +1,5 @@
 import os
+from .config import Config
 from .database import Database
 from .index import Index
 from .commit import Commit
@@ -110,7 +111,11 @@ class Repository:
           with open(merge_head_path, 'r') as f:
               parent_hashes.append(f.read().strip())
       
-      commit = Commit(root_tree.hash, parent_hashes, message)
+      config = Config(self)
+      name = config.get("user", "name", default="Anonymous")
+      email = config.get("user", "email", default="unknown@example.com")
+      
+      commit = Commit(root_tree.hash, parent_hashes, message, author=name, email=email)
       commit_hash = self.db.store(commit.serialize())
       head_ref.update(commit_hash)
       

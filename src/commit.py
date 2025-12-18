@@ -4,7 +4,7 @@ from .formatter import Formatter
 class Commit:
     """Represents a commit object."""
     
-    def __init__(self, tree_hash, parent_hashes, message, author="Isaiah Fisher", email="isaiahpfisher@gmail.com", timestamp=None, timezone=None, committer_name=None, committer_email=None):
+    def __init__(self, tree_hash, parent_hashes, message, author="Anonymous", email="unknown@example.com", timestamp=None, timezone=None, committer_name=None, committer_email=None):
         self.tree_hash = tree_hash
         self.parent_hashes = parent_hashes
         self.message = message

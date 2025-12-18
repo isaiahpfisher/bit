@@ -8,9 +8,8 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.repository import Repository
 from src.commit import Commit # Needed for log tests
-from src.ref import Ref       # Needed for branch tests
+from src.config import Config
 # Need FileDiff to check results
-from src.file_diff import FileDiff 
 
 class TestRepository(unittest.TestCase):
 
@@ -853,7 +852,7 @@ class TestRepository(unittest.TestCase):
         from commands.clone import CloneCommand
         # Instantiate and run the command
         clone_cmd = CloneCommand(self.repo, [source_path, dest_path])
-        clone_cmd.run()
+        clone_cmd.run(print_output=False)
         
         # 3. Verify destination
         self.assertTrue(os.path.isdir(dest_path))
@@ -893,7 +892,7 @@ class TestRepository(unittest.TestCase):
         # Clone it
         dest_path = os.path.join(self.test_dir, "cloned_multi")
         from commands.clone import CloneCommand
-        CloneCommand(self.repo, [source_path, dest_path]).run()
+        CloneCommand(self.repo, [source_path, dest_path]).run(print_output=False)
         
         cloned_repo = Repository(dest_path)
         branches = cloned_repo.list_branches()
@@ -916,10 +915,34 @@ class TestRepository(unittest.TestCase):
         
         f = io.StringIO()
         with redirect_stderr(f):
-            CloneCommand(self.repo, [invalid_source, dest_path]).run()
+            CloneCommand(self.repo, [invalid_source, dest_path]).run(print_output=False)
             
         self.assertIn("does not appear to be a bit repository", f.getvalue())
         self.assertFalse(os.path.exists(dest_path))
 
+    def test_config_set_and_get_local(self):
+        """Tests setting a value in the local repository config."""
+        config = Config(self.repo)
+        config.set("user", "name", "Isaiah")
+        
+        # Verify it can be retrieved
+        self.assertEqual(config.get("user", "name"), "Isaiah")
+        
+        # Verify file exists in .bit/config
+        local_config_path = os.path.join(self.repo.bit_dir, "config")
+        self.assertTrue(os.path.exists(local_config_path))
+
+    def test_local_overrides_global(self):
+        """Tests that local config values take precedence over global ones."""
+        config = Config(self.repo)
+        
+        # Manually point global_path to a temp file for testing
+        config.global_path = os.path.join(self.test_dir, ".bitconfig_test")
+        
+        config.set("user", "email", "global@example.com", global_flag=True)
+        config.set("user", "email", "local@example.com", global_flag=False)
+        
+        self.assertEqual(config.get("user", "email"), "local@example.com")
+        
 if __name__ == '__main__':
     unittest.main()

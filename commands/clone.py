@@ -5,7 +5,7 @@ from .base import BaseCommand
 from src.repository import Repository
 
 class CloneCommand(BaseCommand):
-    def run(self):
+    def run(self, print_output=True):
         if len(self.args) < 1:
             sys.stderr.write("Usage: bit clone <source_path> [<destination_path>]\n")
             return
@@ -27,7 +27,8 @@ class CloneCommand(BaseCommand):
             return
 
         try:
-            print(f"Cloning into '{dest_path}'...")
+            if print_output:
+                print(f"Cloning into '{dest_path}'...")
             
             dest_bit_dir = os.path.join(dest_path, '.bit')
             shutil.copytree(source_bit_dir, dest_bit_dir)
@@ -36,7 +37,8 @@ class CloneCommand(BaseCommand):
             current_branch = new_repo.current_branch()
             new_repo.checkout(current_branch, force=True)
             
-            print("Done.")
+            if print_output:
+                print("Done.")
             
         except Exception as e:
             sys.stderr.write(f"Error during clone: {e}\n")
