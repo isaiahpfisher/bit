@@ -832,6 +832,94 @@ class TestRepository(unittest.TestCase):
         # the implementation should be updated to check status().is_clean()
         with self.assertRaises(Exception):
             self.repo.stash_pop()
+            
+    # ----- CLONE TESTS -----
+    def test_clone_basic(self):
+        """Tests that cloning a repository replicates the worktree and history."""
+        # 1. Setup a source repository with content
+        source_path = os.path.join(self.test_dir, "source_repo")
+        os.makedirs(source_path)
+        source_repo = Repository(source_path)
+        source_repo.init()
+        
+        # Create a file and commit it
+        with open(os.path.join(source_path, "hello.txt"), "w") as f:
+            f.write("hello world")
+        source_repo.add_all()
+        source_repo.commit("initial commit")
+        
+        # 2. Perform the clone
+        dest_path = os.path.join(self.test_dir, "cloned_repo")
+        from commands.clone import CloneCommand
+        # Instantiate and run the command
+        clone_cmd = CloneCommand(self.repo, [source_path, dest_path])
+        clone_cmd.run()
+        
+        # 3. Verify destination
+        self.assertTrue(os.path.isdir(dest_path))
+        self.assertTrue(os.path.isdir(os.path.join(dest_path, ".bit")))
+        
+        # Verify the file was checked out
+        cloned_file = os.path.join(dest_path, "hello.txt")
+        self.assertTrue(os.path.exists(cloned_file))
+        with open(cloned_file, "r") as f:
+            self.assertEqual(f.read(), "hello world")
+            
+        # Verify the history is present
+        cloned_repo = Repository(dest_path)
+        logs = cloned_repo.log()
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0].commit.message, "initial commit")
+
+    def test_clone_multiple_branches(self):
+        """Tests that all branches are copied during a clone."""
+        source_path = os.path.join(self.test_dir, "source_multi")
+        os.makedirs(source_path)
+        source_repo = Repository(source_path)
+        source_repo.init()
+        
+        # Commit to master
+        with open(os.path.join(source_path, "master.txt"), "w") as f: f.write("m")
+        source_repo.add_all()
+        source_repo.commit("master commit")
+        
+        # Create and commit to another branch
+        source_repo.branch("develop")
+        source_repo.checkout("develop")
+        with open(os.path.join(source_path, "dev.txt"), "w") as f: f.write("d")
+        source_repo.add_all()
+        source_repo.commit("dev commit")
+        
+        # Clone it
+        dest_path = os.path.join(self.test_dir, "cloned_multi")
+        from commands.clone import CloneCommand
+        CloneCommand(self.repo, [source_path, dest_path]).run()
+        
+        cloned_repo = Repository(dest_path)
+        branches = cloned_repo.list_branches()
+        
+        self.assertIn("master", branches)
+        self.assertIn("develop", branches)
+        self.assertEqual(cloned_repo.current_branch(), "develop")
+
+    def test_clone_invalid_source_fails(self):
+        """Tests that cloning from a non-existent or non-bit directory fails."""
+        invalid_source = os.path.join(self.test_dir, "not_a_repo")
+        os.makedirs(invalid_source) # Dir exists but no .bit inside
+        
+        dest_path = os.path.join(self.test_dir, "should_fail")
+        
+        from commands.clone import CloneCommand
+        # Redirect stderr to capture the error message
+        import io
+        from contextlib import redirect_stderr
+        
+        f = io.StringIO()
+        with redirect_stderr(f):
+            CloneCommand(self.repo, [invalid_source, dest_path]).run()
+            
+        self.assertIn("does not appear to be a bit repository", f.getvalue())
+        self.assertFalse(os.path.exists(dest_path))
 
 if __name__ == '__main__':
     unittest.main()
